@@ -1,0 +1,3 @@
+# Netlify SPA fallback — serves index.html for all routes
+# Required for Google OAuth redirect (/auth/callback) to work in production
+/* /index.html 200

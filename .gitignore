@@ -1,2 +1,16 @@
 node_modules
 dist/
+
+# Environment secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# Uploaded user content
+uploads/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/settings.json

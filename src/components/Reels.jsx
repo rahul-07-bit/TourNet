@@ -1,69 +1,132 @@
 import React from 'react';
 
-export default function Reels() {
+const REELS_DATA = [
+  {
+    id: 'reel-ladakh',
+    location: 'LADAKH, IN',
+    title: 'Hidden Azure Canyons',
+    image: '/ladakh_mountains.png',
+    glowColor: 'group-hover:shadow-[0_15px_30px_rgba(59,130,246,0.35)]',
+    buttonGlow: 'hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] border-blue-400/30'
+  },
+  {
+    id: 'reel-jaipur',
+    location: 'JAIPUR, IN',
+    title: 'The Saffron Route',
+    image: '/jaipur_palace.png',
+    glowColor: 'group-hover:shadow-[0_15px_30px_rgba(245,158,11,0.35)]',
+    buttonGlow: 'hover:shadow-[0_0_15px_rgba(245,158,11,0.5)] border-amber-400/30'
+  },
+  {
+    id: 'reel-kerala',
+    location: 'KERALA, IN',
+    title: 'Floating Serenities',
+    image: '/kerala_backwaters.png',
+    glowColor: 'group-hover:shadow-[0_15px_30px_rgba(16,185,129,0.35)]',
+    buttonGlow: 'hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] border-emerald-400/30'
+  },
+  {
+    id: 'reel-varanasi',
+    location: 'VARANASI, IN',
+    title: 'Sacred Ganga Aarti',
+    image: '/ganga_aarti.png',
+    glowColor: 'group-hover:shadow-[0_15px_30px_rgba(239,68,68,0.35)]',
+    buttonGlow: 'hover:shadow-[0_0_15px_rgba(239,68,68,0.5)] border-red-400/30'
+  },
+  {
+    id: 'reel-goa',
+    location: 'GOA, IN',
+    title: 'Sunset Beach Bliss',
+    image: '/goa_sunset.png',
+    glowColor: 'group-hover:shadow-[0_15px_30px_rgba(244,63,94,0.35)]',
+    buttonGlow: 'hover:shadow-[0_0_15px_rgba(244,63,94,0.5)] border-rose-400/30'
+  }
+];
+
+export default function ReelsPreview() {
   return (
-    <section className="mt-stack-lg">
-      <div className="container mx-auto px-container-margin mb-stack-md flex justify-between items-center">
-        <h2 className="font-headline-sm text-headline-sm">Trending Travel Reels</h2>
-        <button className="text-on-surface-variant text-label-md flex items-center">
-          Full Experience <span className="material-symbols-outlined ml-1" data-icon="open_in_full">open_in_full</span>
+    <section className="mt-16 relative">
+      {/* Decorative ambient background glows */}
+      <div className="absolute top-1/2 left-1/4 w-80 h-80 bg-orange-600/5 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-blue-600/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+      <div className="container mx-auto px-container-margin mb-6 flex justify-between items-center relative z-10">
+        <div>
+          <h2 className="font-headline-sm text-headline-sm text-white/95 flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary-container" data-icon="movie" style={{fontVariationSettings: "'FILL' 1"}}>movie</span>
+            Trending Travel Reels
+          </h2>
+          <p className="text-[12px] text-on-surface-variant/75 mt-1">Immersive stories and cinematic glances from explorers</p>
+        </div>
+        <button 
+          onClick={() => alert('Full cinematic reels screen requested! 🎬')}
+          className="text-on-surface-variant hover:text-primary text-label-md flex items-center gap-1 glass px-3 py-1.5 rounded-full border border-white/5 transition-all active:scale-95"
+        >
+          Full Experience 
+          <span className="material-symbols-outlined text-[16px]" data-icon="open_in_full">open_in_full</span>
         </button>
       </div>
       
-      <div className="flex gap-gutter overflow-x-auto no-scrollbar px-container-margin">
-        {/* Reel Item 1 */}
-        <div className="flex-shrink-0 w-72 aspect-[9/16] rounded-3xl overflow-hidden relative group">
-          <img 
-            className="w-full h-full object-cover" 
-            alt="Ladakh" 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDL0PaRWOjP-nFkqTUeZXoYFGmm73YTLexrsMJfY6yqAkCBWYjZ7MGM6mXI_i27pCa0KZMiA8Y69SMQjDgj1bEp839cZnTsy-6xbSL_gZz3axO3iQO8oIiLpYvFLtDbGFl08xqJdABZklX-0tpPER3mZqQqAZ2ZRzkIS9usZZVC9GLRU11vNN_1mYj62QURUMH8zi1mCjym80Xw7hGlNgiHJmdGwvIMuAOyzxLq8MgJtDbE60koUSX3dwCFDCBIzvbRNNM4ubDVJfQr" 
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-          <div className="absolute top-4 left-4 flex items-center gap-2 glass px-2 py-1 rounded-full">
-            <span className="material-symbols-outlined text-[14px] text-primary" data-icon="location_on">location_on</span>
-            <span className="text-[10px] font-bold text-white uppercase">Ladakh, IN</span>
+      {/* Horizontal card list */}
+      <div className="flex gap-6 overflow-x-auto no-scrollbar px-container-margin pb-6 scroll-smooth relative z-10">
+        {REELS_DATA.map((reel) => (
+          <div 
+            key={reel.id}
+            className={`flex-shrink-0 w-72 aspect-[9/16] rounded-3xl overflow-hidden relative group cursor-pointer transition-all duration-500 hover:translate-y-[-10px] border border-white/10 hover:border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.6)] ${reel.glowColor}`}
+          >
+            {/* Immersive Image */}
+            <img 
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+              alt={reel.title} 
+              src={reel.image} 
+            />
+
+            {/* Dark Overlay Vignette for text contrast */}
+            <div className="absolute inset-0 card-gradient-overlay opacity-80 group-hover:opacity-90 transition-opacity duration-300"></div>
+            
+            {/* Top-Left Location Tag */}
+            <div className="absolute top-4 left-4 flex items-center gap-1.5 glass backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-sm">
+              <span className="material-symbols-outlined text-[13px] text-primary" data-icon="location_on">location_on</span>
+              <span className="text-[10px] font-bold text-white tracking-widest uppercase">{reel.location}</span>
+            </div>
+
+            {/* Bookmark button overlay */}
+            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  alert(`Saved ${reel.title} to bookmarks! 📌`);
+                }}
+                className="w-8 h-8 rounded-full glass flex items-center justify-center border border-white/10 text-white/80 hover:text-white"
+              >
+                <span className="material-symbols-outlined text-[16px]">bookmark</span>
+              </button>
+            </div>
+
+            {/* Bottom Content overlay */}
+            <div className="absolute bottom-5 left-5 right-5 space-y-4">
+              <div>
+                <p className="text-white font-extrabold text-[18px] leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                  {reel.title}
+                </p>
+              </div>
+
+              {/* Glowing "Plan This Trip" button */}
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  alert(`AI itinerary generation initialized for ${reel.title}! 🗺️`);
+                }}
+                className={`w-full py-2.5 glass rounded-xl text-label-md text-primary font-bold hover:bg-primary-container hover:text-on-primary-container transition-all duration-300 border ${reel.buttonGlow}`}
+              >
+                Plan This Trip
+              </button>
+            </div>
+
+            {/* Apple Vision Pro inspired sheen overlay */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
           </div>
-          <div className="absolute bottom-4 left-4 right-4">
-            <p className="text-white font-bold text-label-lg mb-stack-sm">Hidden Azure Canyons</p>
-            <button className="w-full py-2 glass rounded-xl text-label-md text-primary font-bold hover:bg-primary-container hover:text-on-primary-container transition-all">Plan This Trip</button>
-          </div>
-        </div>
-        
-        {/* Reel Item 2 */}
-        <div className="flex-shrink-0 w-72 aspect-[9/16] rounded-3xl overflow-hidden relative group">
-          <img 
-            className="w-full h-full object-cover" 
-            alt="Jaipur" 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_VaaCm79GUzQe0FCsbUde1LXAVkLM6oQ7vQuS8LbUgwU--muDj8Nwl82C2DVd7aENgxdP5pHfq_cSNotqPSHBAoOhnMlVZOwmg6jhhr5TFHtoGorcDeiWlFVCR-9hoqmDa1y3l8knV__UeQQvyoxA5jhUr1sRFX6gpdGt7EfQFnVzSRUx_KSCNPtMJGDPfptYkMXOZwNZ01qKMbjb8qlOAyvH0LtdGAfIdZn6-2DGRiJqifWThOmJo1JqgDdqno8y4K38IorDsLMn" 
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-          <div className="absolute top-4 left-4 flex items-center gap-2 glass px-2 py-1 rounded-full">
-            <span className="material-symbols-outlined text-[14px] text-primary" data-icon="location_on">location_on</span>
-            <span className="text-[10px] font-bold text-white uppercase">Jaipur, IN</span>
-          </div>
-          <div className="absolute bottom-4 left-4 right-4">
-            <p className="text-white font-bold text-label-lg mb-stack-sm">The Saffron Route</p>
-            <button className="w-full py-2 glass rounded-xl text-label-md text-primary font-bold hover:bg-primary-container hover:text-on-primary-container transition-all">Plan This Trip</button>
-          </div>
-        </div>
-        
-        {/* Reel Item 3 */}
-        <div className="flex-shrink-0 w-72 aspect-[9/16] rounded-3xl overflow-hidden relative group">
-          <img 
-            className="w-full h-full object-cover" 
-            alt="Kerala" 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnRNTnipg29t6U8TrHAA3YtX4cNq6TYC3RXyjUeaZ4YQVRKr8I39IVPRCALVWoWCmiadhWnCE9_aT3Hv08Dxm2mm204VKmCJwLy0yiUGLo6LovTVFCFYKrHNiX8fC7Xk_euEm2E4l6ZmD4fpycg5pwZKZvFNxTR1To_5iaCyrKbOoOAlaxclsjGuQ-p2mL04hMQ20LWclFofb3E4agLXkw6qMjZX99T69omrMHekLq0YlbofmRozzJWDqgqpSJTDMLxm_PkG4l7Ik4" 
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-          <div className="absolute top-4 left-4 flex items-center gap-2 glass px-2 py-1 rounded-full">
-            <span className="material-symbols-outlined text-[14px] text-primary" data-icon="location_on">location_on</span>
-            <span className="text-[10px] font-bold text-white uppercase">Kerala, IN</span>
-          </div>
-          <div className="absolute bottom-4 left-4 right-4">
-            <p className="text-white font-bold text-label-lg mb-stack-sm">Floating Serenities</p>
-            <button className="w-full py-2 glass rounded-xl text-label-md text-primary font-bold hover:bg-primary-container hover:text-on-primary-container transition-all">Plan This Trip</button>
-          </div>
-        </div>
+        ))}
       </div>
     </section>
   );
