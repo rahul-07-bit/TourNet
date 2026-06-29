@@ -187,6 +187,15 @@ export function AuthProvider({ children }) {
       throw new Error(`Please wait ${cooldown}s before resending.`);
     }
 
+    // ── Mock Sandbox: bypass real backend in demo / development mode ──
+    if (isMockSandbox) {
+      markOtpSent();
+      // Store a fixed mock OTP so verifyOtp can validate it
+      sessionStorage.setItem('tournet_mock_otp', '123456');
+      sessionStorage.setItem('tournet_mock_otp_email', email.trim().toLowerCase());
+      return; // success — no real email sent
+    }
+
     setIsLoading(true);
     try {
       const response = await fetch('/api/auth/send-otp', {
@@ -195,14 +204,22 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ email: email.trim(), name: name.trim() }),
       });
 
-      const data = await response.json();
+      // Safe JSON parse — proxy or network failures can return non-JSON responses
+      let data = {};
+      try {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error('Network error — the authentication server may be offline. Please try again later.');
+      }
+
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Failed to send OTP');
       }
 
       markOtpSent();
     } catch (err) {
-      throw new Error(err.message || 'Failed to send OTP');
+      throw new Error(normalizeError(err));
     } finally {
       setIsLoading(false);
     }
@@ -210,6 +227,38 @@ export function AuthProvider({ children }) {
 
   /** Verify exact 6-digit OTP using our backend API */
   const verifyOtp = useCallback(async (email, token, name = '') => {
+    // ── Mock Sandbox: validate against the stored mock OTP ──
+    if (isMockSandbox) {
+      const storedOtp   = sessionStorage.getItem('tournet_mock_otp') || '123456';
+      const storedEmail = sessionStorage.getItem('tournet_mock_otp_email') || '';
+      if (token.trim() !== storedOtp || email.trim().toLowerCase() !== storedEmail) {
+        throw new Error('Invalid OTP. Please try again. (hint: use 123456 in demo mode)');
+      }
+      // Build a mock session and store it
+      const mockSession = {
+        access_token: 'mock-otp-token',
+        refresh_token: 'mock-otp-refresh',
+        user: {
+          id: `mock-otp-${Date.now()}`,
+          aud: 'authenticated',
+          role: 'authenticated',
+          email: email.trim().toLowerCase(),
+          email_confirmed_at: new Date().toISOString(),
+          app_metadata: { provider: 'email' },
+          user_metadata: {
+            full_name: name || email.split('@')[0],
+            name: name || email.split('@')[0],
+          },
+        },
+      };
+      localStorage.setItem('tournet_mock_session', JSON.stringify(mockSession));
+      sessionStorage.removeItem('tournet_mock_otp');
+      sessionStorage.removeItem('tournet_mock_otp_email');
+      // Trigger auth state by reloading
+      window.location.href = window.location.origin + '/auth/callback?code=mock-otp-code';
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await fetch('/api/auth/verify-otp', {
@@ -218,7 +267,15 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ email: email.trim(), otp: token.trim(), name: name.trim() }),
       });
 
-      const data = await response.json();
+      // Safe JSON parse — proxy or network failures can return non-JSON responses
+      let data = {};
+      try {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error('Network error — the authentication server may be offline. Please try again later.');
+      }
+
       if (!response.ok || !data.success) {
         // Return raw error message from backend or default to standard message
         throw new Error(data.error || 'Verification failed');
@@ -239,10 +296,8 @@ export function AuthProvider({ children }) {
 
   /** Google OAuth redirect handler */
   const loginWithGoogle = useCallback(async () => {
-    if (!isConfigured) {
-      const errorMsg = "Developer Error: Supabase URL or Anon Key is missing or contains 'placeholder'. Please set valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.";
-      console.error(errorMsg);
-      throw new Error(errorMsg);
+    if (!isConfigured && !isMockSandbox) {
+      throw new Error('Sign-in is not configured. Please set your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the .env file.');
     }
 
     setIsLoading(true);

@@ -45,7 +45,11 @@ export async function connectDB(attempt = 1) {
       '❌ [MongoDB] MONGODB_URI is not set in your .env file.\n' +
       '   Add it:  MONGODB_URI=mongodb+srv://<user>:<pass>@cluster.mongodb.net/tournet?retryWrites=true&w=majority'
     );
-    process.exit(1);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    } else {
+      throw new Error('MONGODB_URI is not set in environment variables.');
+    }
   }
 
   try {
@@ -88,7 +92,11 @@ export async function connectDB(attempt = 1) {
     }
 
     console.error('💀 [MongoDB] All connection attempts exhausted. Exiting.');
-    process.exit(1);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    } else {
+      throw new Error(`All MongoDB connection attempts exhausted: ${err.message}`);
+    }
   }
 }
 

@@ -27,23 +27,28 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /* ── Configuration guard ───────────────────────────────────────────────── */
+// Placeholder / demo URLs that indicate real credentials haven't been set
+const PLACEHOLDER_URLS = ['tournet-project-xyz', 'placeholder', 'localhost', 'example'];
+
 export const isConfigured = Boolean(
   supabaseUrl &&
   supabaseKey &&
   supabaseUrl.startsWith('https://') &&
-  !supabaseUrl.includes('placeholder') &&
+  !PLACEHOLDER_URLS.some(p => supabaseUrl.includes(p)) &&
   !supabaseKey.includes('placeholder')
 );
 
-export const isMockSandbox = isConfigured && (
-  supabaseUrl.includes('tournet-project-xyz') ||
-  supabaseUrl.includes('localhost') ||
-  supabaseUrl.includes('example')
+// isMockSandbox: real Supabase project but we want to intercept calls with mock data
+// (Only applies if a genuinely-looking but known-test URL is detected)
+export const isMockSandbox = !isConfigured && Boolean(
+  supabaseUrl &&
+  supabaseKey &&
+  supabaseUrl.startsWith('https://')
 );
 
 const throwDevError = () => {
-  const errorMsg = "Developer Error: Supabase URL or Anon Key is missing or contains 'placeholder'. Please set valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.";
-  console.error(errorMsg);
+  const errorMsg = 'Auth service is not yet configured. Please add your real VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to the .env file to enable sign-in.';
+  console.warn('[TourNet]', errorMsg);
   throw new Error(errorMsg);
 };
 

@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { isMockSandbox } from '../../lib/supabase';
 import OTPInput from './OTPInput';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -373,6 +374,21 @@ function LoginPage({ onSwitch, flashMessage }) {
 
         <AlertBanner message={apiError} type="error" />
         {flashMessage && <AlertBanner message={flashMessage.text} type={flashMessage.type} />}
+
+        {/* Demo mode notice */}
+        {isMockSandbox && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 10, marginBottom: 16,
+            background: 'rgba(255,180,30,0.08)',
+            border: '1px solid rgba(255,180,30,0.22)',
+            color: 'rgba(255,210,100,0.90)',
+            fontSize: 11, fontWeight: 600, lineHeight: 1.5,
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>info</span>
+            <span>Demo mode — use any email &amp; OTP code <strong>123456</strong>. No real email is sent.</span>
+          </div>
+        )}
 
         {/* Google */}
         <button
