@@ -300,7 +300,7 @@ function LoginPage({ onSwitch, flashMessage }) {
     if (!validateEmail()) return;
     try {
       await sendOtp(email);
-      setCooldown(30); // 30 seconds resend restriction
+      setCooldown(10); // allow repeated testing while keeping a short resend guard
       setSuccess('OTP Sent Successfully');
       setStep(2);
     } catch (err) {
@@ -329,7 +329,7 @@ function LoginPage({ onSwitch, flashMessage }) {
     setSuccess('');
     try {
       await sendOtp(email);
-      setCooldown(30); // 30 seconds
+      setCooldown(10); // allow repeated testing while keeping a short resend guard
       setSuccess('OTP Sent Successfully');
     } catch (err) {
       setApiError(err.message);
@@ -533,7 +533,7 @@ function SignupPage({ onSwitch }) {
     if (!validateForm()) return;
     try {
       await sendOtp(email, name);
-      setCooldown(30); // 30 seconds resend restriction
+      setCooldown(10); // allow repeated testing while keeping a short resend guard
       setSuccess('OTP Sent Successfully');
       setStep(2);
     } catch (err) {
@@ -560,7 +560,7 @@ function SignupPage({ onSwitch }) {
     setSuccess('');
     try {
       await sendOtp(email, name);
-      setCooldown(30); // 30 seconds resend restriction
+      setCooldown(10); // allow repeated testing while keeping a short resend guard
       setSuccess('OTP Sent Successfully');
     } catch (err) {
       setApiError(err.message);

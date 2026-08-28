@@ -51,10 +51,10 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Initialize Supabase Admin Client
+// Initialize Supabase Admin Client. Support both the frontend VITE_ names and the
+// backend SUPABASE_ names so the project works in dev and deploy environments.
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-// We require the Service Role Key for secure admin operations like creating/confirming users
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 let supabaseAdmin = null;
 

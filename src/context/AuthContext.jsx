@@ -24,13 +24,14 @@ const AuthContext = createContext(null);
 
 /* ─────────────────────────────────────────────────────────────
    OTP client-side rate limiter
-   Cooldown set to 60 seconds (60_000ms) as per requirements.
+   This is only a short local cooldown for UI testing. Real Supabase Auth
+   rate limiting remains enforced server-side and will still throttle OTP sends.
    ───────────────────────────────────────────────────────────── */
 const OTP_KEY         = 'tournet_otp_last_sent';
-const OTP_COOLDOWN_MS = 60_000;
+const OTP_COOLDOWN_MS = 10_000;
 
-function getLastOtpSent()  { return Number(localStorage.getItem(OTP_KEY) || 0); }
-function markOtpSent()     { localStorage.setItem(OTP_KEY, String(Date.now())); }
+function getLastOtpSent()  { return Number(sessionStorage.getItem(OTP_KEY) || 0); }
+function markOtpSent()     { sessionStorage.setItem(OTP_KEY, String(Date.now())); }
 function otpCooldownLeft() {
   const elapsed = Date.now() - getLastOtpSent();
   return elapsed < OTP_COOLDOWN_MS ? Math.ceil((OTP_COOLDOWN_MS - elapsed) / 1000) : 0;
@@ -73,7 +74,7 @@ function normalizeError(err) {
     msg.includes('over_email_send_rate_limit') ||
     msg.includes('429')
   ) {
-    return 'Too many attempts. Please wait a moment before trying again.';
+    return 'OTP rate limit reached. Please wait 30–60 seconds and try again, or request a new code after a short pause.';
   }
   if (msg.includes('jwt expired') || msg.includes('session_expired')) {
     return 'Your session has expired. Please sign in again.';
@@ -180,7 +181,7 @@ export function AuthProvider({ children }) {
      OTP AUTH ACTIONS
      ═══════════════════════════════════════════════════════════ */
 
-  /** Send secure 6-digit OTP to user email using our backend API */
+  /** Send a Supabase email OTP to the user */
   const sendOtp = useCallback(async (email, name = '') => {
     const cooldown = otpCooldownLeft();
     if (cooldown > 0) {
@@ -190,33 +191,27 @@ export function AuthProvider({ children }) {
     // ── Mock Sandbox: bypass real backend in demo / development mode ──
     if (isMockSandbox) {
       markOtpSent();
-      // Store a fixed mock OTP so verifyOtp can validate it
       sessionStorage.setItem('tournet_mock_otp', '123456');
       sessionStorage.setItem('tournet_mock_otp_email', email.trim().toLowerCase());
-      return; // success — no real email sent
+      return;
+    }
+
+    if (!isConfigured) {
+      throw new Error('Sign-in is not configured. Please set your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the .env file.');
     }
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), name: name.trim() }),
+      const formattedEmail = email.trim().toLowerCase();
+      const { error } = await supabase.auth.signInWithOtp({
+        email: formattedEmail,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
-      // Safe JSON parse — proxy or network failures can return non-JSON responses
-      let data = {};
-      try {
-        const text = await response.text();
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        throw new Error('Network error — the authentication server may be offline. Please try again later.');
-      }
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to send OTP');
-      }
-
+      if (error) throw error;
       markOtpSent();
     } catch (err) {
       throw new Error(normalizeError(err));
@@ -225,7 +220,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  /** Verify exact 6-digit OTP using our backend API */
+  /** Verify the 6-digit email OTP using Supabase Auth */
   const verifyOtp = useCallback(async (email, token, name = '') => {
     // ── Mock Sandbox: validate against the stored mock OTP ──
     if (isMockSandbox) {
@@ -234,7 +229,6 @@ export function AuthProvider({ children }) {
       if (token.trim() !== storedOtp || email.trim().toLowerCase() !== storedEmail) {
         throw new Error('Invalid OTP. Please try again. (hint: use 123456 in demo mode)');
       }
-      // Build a mock session and store it
       const mockSession = {
         access_token: 'mock-otp-token',
         refresh_token: 'mock-otp-refresh',
@@ -254,41 +248,31 @@ export function AuthProvider({ children }) {
       localStorage.setItem('tournet_mock_session', JSON.stringify(mockSession));
       sessionStorage.removeItem('tournet_mock_otp');
       sessionStorage.removeItem('tournet_mock_otp_email');
-      // Trigger auth state by reloading
       window.location.href = window.location.origin + '/auth/callback?code=mock-otp-code';
       return;
     }
 
+    if (!isConfigured) {
+      throw new Error('Sign-in is not configured. Please set your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the .env file.');
+    }
+
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), otp: token.trim(), name: name.trim() }),
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: token.trim(),
+        type: 'email',
       });
 
-      // Safe JSON parse — proxy or network failures can return non-JSON responses
-      let data = {};
-      try {
-        const text = await response.text();
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        throw new Error('Network error — the authentication server may be offline. Please try again later.');
+      if (error) throw error;
+      if (!data?.session) {
+        throw new Error('Verification succeeded but no session was created.');
       }
 
-      if (!response.ok || !data.success) {
-        // Return raw error message from backend or default to standard message
-        throw new Error(data.error || 'Verification failed');
-      }
-
-      // If validation succeeds, backend returns actionLink to log the user in via Supabase redirect
-      if (data.actionLink) {
-        window.location.href = data.actionLink;
-      } else {
-        throw new Error('Verification succeeded but session link was missing');
-      }
+      // Let Supabase auth state listeners populate the authenticated user/session.
+      window.location.href = window.location.origin + '/auth/callback';
     } catch (err) {
-      throw err; // propagates the exact backend error (e.g. OTP Expired, Invalid OTP)
+      throw new Error(normalizeError(err));
     } finally {
       setIsLoading(false);
     }
