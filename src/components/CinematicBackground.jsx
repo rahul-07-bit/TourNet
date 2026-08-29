@@ -51,19 +51,23 @@ export default function CinematicBackground() {
         transform: `translateY(${pBg * 0.05}px)`,
       }} />
 
-      {/* ── Layer 1: Himalayan Mountain Photo ──────────────────── */}
+      {/* ── Layer 1: Biker Background Video ──────────────────── */}
       <div style={{
         position: 'absolute', top: '-6%', bottom: '-6%', left: '-5%', right: '-5%',
         transform: `translateY(${pBg}px) scale(1.05)`,
         willChange: 'transform',
       }}>
-        <img
-          src="https://images.unsplash.com/photo-1589308078059-be1415eab4c3?auto=format&fit=crop&w=1920&q=80"
-          alt="Majestic Himalayas Sunrise"
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          src="/videos/kashi.mp4"
           style={{
             width: '100%', height: '100%',
             objectFit: 'cover',
             objectPosition: '50% 35%',
+            display: 'block',
           }}
           className="animate-ken-burns"
         />

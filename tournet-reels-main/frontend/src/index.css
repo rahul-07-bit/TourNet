@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: theme('colors.dusk.950');
+  color: theme('colors.sand.DEFAULT');
+  font-family: theme('fontFamily.body');
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: theme('colors.dusk.600');
+  border-radius: 999px;
+}
+
+/* Reel feed: one full-viewport reel at a time, vertical snap scrolling */
+.reel-feed {
+  scroll-snap-type: y mandatory;
+  overflow-y: scroll;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+}
+.reel-feed::-webkit-scrollbar {
+  display: none;
+}
+
+.reel-slide {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+/* Signature element: the "trail rail" — a vertical itinerary-style
+   progress marker on the right edge of the feed, standing in for
+   generic dot pagination. Each dash represents one reel; the active
+   dash stretches and glows like a lit waypoint. */
+.trail-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.trail-dash {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: rgba(245, 241, 234, 0.25);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.trail-dash.active {
+  height: 26px;
+  background: linear-gradient(180deg, #FF9666, #FF7A45);
+  box-shadow: 0 0 10px rgba(255, 122, 69, 0.6);
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trail-dash, .animate-fade-in-up { animation: none !important; transition: none !important; }
+}
