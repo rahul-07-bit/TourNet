@@ -9,8 +9,9 @@ import {
   getInteractions,
   getProfiles,
   getReels,
+  recordView,
   reportReel,
-  signedUrl,
+  publicStorageUrl,
   toggleRelation,
 } from '../../services/reelService';
 
@@ -42,10 +43,19 @@ function ReelVideo({ reel, isActive }) {
     setUrl('');
     setError(false);
     setLoading(true);
-    signedUrl(reel.video_path)
-      .then((value) => mounted && setUrl(value))
-      .catch(() => mounted && setError(true))
-      .finally(() => mounted && setLoading(false));
+    try {
+      const value = publicStorageUrl(reel.video_path);
+      if (import.meta.env.DEV) {
+        console.info('[TourNet Reels] video_path', reel.video_path);
+        console.info('[TourNet Reels] public video URL', value);
+      }
+      if (mounted) setUrl(value);
+    } catch (err) {
+      if (mounted) setError(true);
+      if (import.meta.env.DEV) console.error('[TourNet Reels] could not build video URL', err);
+    } finally {
+      if (mounted) setLoading(false);
+    }
     return () => { mounted = false; };
   }, [reel.video_path]);
 
@@ -71,9 +81,12 @@ function ReelVideo({ reel, isActive }) {
         preload={isActive ? 'metadata' : 'none'}
         onCanPlay={() => setLoading(false)}
         onClick={(event) => event.currentTarget.paused ? event.currentTarget.play() : event.currentTarget.pause()}
-        onError={() => setError(true)}
+        onError={(event) => {
+          setError(true);
+          if (import.meta.env.DEV) console.error('[TourNet Reels] video element error', event.currentTarget.error);
+        }}
       />
-      <button className="reel-mute" type="button" onClick={() => setMuted((value) => !value)}>
+      <button className="reel-mute" type="button" onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Unmute Reel' : 'Mute Reel'} title={muted ? 'Unmute' : 'Mute'}>
         <span className="material-symbols-outlined">{muted ? 'volume_off' : 'volume_up'}</span>
       </button>
     </>
@@ -157,7 +170,7 @@ function CreateReelModal({ onClose, onCreated, user }) {
   return (
     <div className="reel-modal" role="dialog" aria-modal="true">
       <form className="reel-dialog" onSubmit={publish}>
-        <button type="button" onClick={onClose} aria-label="Close">x</button>
+        <button type="button" onClick={onClose} aria-label="Close">×</button>
         <h3>Create a Reel</h3>
         <label className="reel-file">
           <span className="material-symbols-outlined">video_library</span>
@@ -235,7 +248,7 @@ function CommentsModal({ reel, user, onClose, onCountChange }) {
   return (
     <div className="reel-modal" role="dialog" aria-modal="true">
       <div className="reel-dialog">
-        <button type="button" onClick={onClose} aria-label="Close">x</button>
+        <button type="button" onClick={onClose} aria-label="Close">×</button>
         <h3>Comments</h3>
         {loading && <p className="reel-status">Loading comments...</p>}
         {error && <p className="reel-form-error">{error}</p>}
@@ -272,6 +285,7 @@ export default function ReelsSection() {
   const [message, setMessage] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [commentsReel, setCommentsReel] = useState(null);
+  const viewedRef = useRef(new Set());
 
   const load = async () => {
     setLoading(true);
@@ -297,6 +311,19 @@ export default function ReelsSection() {
   const patchReel = (reelId, changes) => {
     setReels((previous) => previous.map((item) => item.id === reelId ? { ...item, ...changes } : item));
   };
+
+  useEffect(() => {
+    const reel = reels[active];
+    if (!reel || !user?.id || viewedRef.current.has(reel.id)) return;
+
+    viewedRef.current.add(reel.id);
+    patchReel(reel.id, { views_count: Number(reel.views_count || 0) + 1 });
+    recordView(reel.id, user.id).catch((err) => {
+      viewedRef.current.delete(reel.id);
+      patchReel(reel.id, { views_count: reel.views_count || 0 });
+      setMessage(err.message || 'Could not record Reel view.');
+    });
+  }, [active, reels, user?.id]);
 
   const toggle = async (table, reelId, state, setState, countField) => {
     if (!user) return setMessage('Sign in to interact with Reels.');
@@ -391,18 +418,18 @@ export default function ReelsSection() {
               <div className="reel-copy">
                 <p>{current.caption}</p>
                 <small>{(current.hashtags || []).map((tag) => `#${tag}`).join(' ')}</small>
-                <small>{current.location} · {formatCount(current.views_count)} views</small>
+                <small>{current.location || 'Traveling'} · {formatCount(current.views_count)} views</small>
               </div>
               <aside>
-                <button type="button" onClick={() => toggle('reel_likes', current.id, liked, setLiked, 'likes_count')}><span>{liked.has(current.id) ? 'Favorite' : 'Like'}</span><small>{formatCount(current.likes_count)}</small></button>
-                <button type="button" onClick={() => setCommentsReel(current)}><span>Comment</span><small>{formatCount(current.comments_count)}</small></button>
-                <button type="button" onClick={() => toggle('reel_saves', current.id, saved, setSaved, 'saves_count')}><span>{saved.has(current.id) ? 'Saved' : 'Save'}</span><small>{formatCount(current.saves_count)}</small></button>
-                <button type="button" onClick={() => share(current)}><span>Share</span></button>
+                <button type="button" className={liked.has(current.id) ? 'is-active' : ''} aria-label={liked.has(current.id) ? 'Unlike Reel' : 'Like Reel'} title={liked.has(current.id) ? 'Unlike' : 'Like'} onClick={() => toggle('reel_likes', current.id, liked, setLiked, 'likes_count')}><span className="material-symbols-outlined">favorite</span><small>{formatCount(current.likes_count)}</small></button>
+                <button type="button" aria-label="Open comments" title="Comments" onClick={() => setCommentsReel(current)}><span className="material-symbols-outlined">chat_bubble</span><small>{formatCount(current.comments_count)}</small></button>
+                <button type="button" className={saved.has(current.id) ? 'is-active' : ''} aria-label={saved.has(current.id) ? 'Unsave Reel' : 'Save Reel'} title={saved.has(current.id) ? 'Unsave' : 'Save'} onClick={() => toggle('reel_saves', current.id, saved, setSaved, 'saves_count')}><span className="material-symbols-outlined">bookmark</span><small>{formatCount(current.saves_count)}</small></button>
+                <button type="button" aria-label="Share Reel" title="Share" onClick={() => share(current)}><span className="material-symbols-outlined">ios_share</span></button>
                 <button type="button" onClick={async () => {
                   if (!user) return setMessage('Sign in to report or manage Reels.');
                   if (user.id === current.user_id) return removeReel(current);
                   return reportReel(current.id, user.id).then(() => setMessage('Reel reported.')).catch((err) => setMessage(err.message));
-                }}><span>More</span></button>
+                }} aria-label={user?.id === current.user_id ? 'Delete Reel' : 'Report Reel'} title={user?.id === current.user_id ? 'Delete' : 'Report'}><span className="material-symbols-outlined">{user?.id === current.user_id ? 'delete' : 'more_horiz'}</span></button>
               </aside>
             </article>
           </div>

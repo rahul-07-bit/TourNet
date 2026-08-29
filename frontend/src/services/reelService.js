@@ -2,6 +2,13 @@ import { supabase } from './supabase/supabase';
 
 const BUCKET = 'reels';
 
+function storageFileName(file, fallback) {
+  return (file?.name || fallback)
+    .trim()
+    .replace(/[^\w.\-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function withReelError(error) {
   if (!error) return null;
   if (error.code === 'PGRST205' || /Could not find the table/i.test(error.message || '')) {
@@ -58,6 +65,17 @@ export async function toggleRelation(table, reelId, userId, active) {
   return supabase.from(table).insert({ reel_id: reelId, user_id: userId });
 }
 
+export async function recordView(reelId, userId) {
+  if (!userId) return { error: null };
+
+  const { error } = await supabase
+    .from('reel_views')
+    .insert({ reel_id: reelId, user_id: userId });
+
+  if (error && error.code !== '23505') throw withReelError(error);
+  return { error: null };
+}
+
 export async function getComments(reelId) {
   const { data, error } = await supabase
     .from('reel_comments')
@@ -92,19 +110,17 @@ export async function deleteComment(commentId, userId) {
 
 export async function createReel({ file, thumbnail, caption, location, hashtags, duration, userId }) {
   const id = crypto.randomUUID();
-  const ext = file.name.split('.').pop().toLowerCase();
-  const base = `${userId}/${id}`;
+  const videoPath = `${userId}/${id}/${storageFileName(file, 'video.mp4')}`;
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
-    .upload(`${base}/video.${ext}`, file, { contentType: file.type, upsert: false });
+    .upload(videoPath, file, { contentType: file.type, upsert: false });
 
   if (uploadError) throw uploadError;
 
   let thumbnailPath = null;
   if (thumbnail) {
-    const thumbExt = thumbnail.name.split('.').pop().toLowerCase();
-    thumbnailPath = `${base}/thumbnail.${thumbExt}`;
+    thumbnailPath = `${userId}/${id}/${storageFileName(thumbnail, 'thumbnail.jpg')}`;
     const { error } = await supabase.storage
       .from(BUCKET)
       .upload(thumbnailPath, thumbnail, { contentType: thumbnail.type, upsert: false });
@@ -116,12 +132,12 @@ export async function createReel({ file, thumbnail, caption, location, hashtags,
     .insert({
       id,
       user_id: userId,
-      video_path: `${base}/video.${ext}`,
+      video_path: videoPath,
       thumbnail_path: thumbnailPath,
-      caption,
-      location,
-      hashtags,
-      duration,
+      caption: caption.trim(),
+      location: location.trim(),
+      hashtags: hashtags || [],
+      duration: duration || null,
     })
     .select()
     .single();
@@ -130,10 +146,10 @@ export async function createReel({ file, thumbnail, caption, location, hashtags,
   return data;
 }
 
-export async function signedUrl(path) {
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
-  if (error) throw error;
-  return data.signedUrl;
+export function publicStorageUrl(path) {
+  if (!path) throw new Error('Reel video_path is missing.');
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export async function deleteReel(reel, userId) {
