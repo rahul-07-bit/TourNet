@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../services/supabase/supabase';
 
 const GoogleSVG = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">

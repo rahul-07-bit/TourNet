@@ -14,8 +14,8 @@ import React, {
   createContext, useContext, useState,
   useEffect, useCallback, useRef,
 } from 'react';
-import { supabase, isConfigured, isMockSandbox, OAUTH_REDIRECT_URL, cleanOAuthUrl } from '../lib/supabase';
-import { getProfile, upsertProfile, updateProfile, mergeGuestData } from '../lib/userService';
+import { supabase, isConfigured, isMockSandbox, OAUTH_REDIRECT_URL, cleanOAuthUrl } from '../services/supabase/supabase';
+import { getProfile, upsertProfile, updateProfile, mergeGuestData } from '../services/supabase/userService';
 
 /* ─────────────────────────────────────────────────────────────
    Context

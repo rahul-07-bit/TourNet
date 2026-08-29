@@ -25,7 +25,7 @@ import ProtectedRoute             from './components/ProtectedRoute';
 import Dashboard                  from './pages/Dashboard';
 import AuthPage                   from './components/auth/AuthPage';
 import LoginPromptModal           from './components/auth/LoginPromptModal';
-import { isOAuthCallback }        from './lib/supabase';
+import { isOAuthCallback }        from './services/supabase/supabase';
 import AuthCallback               from './pages/AuthCallback';
 
 /* ═══════════════════════════════════════════════════════════════════
