@@ -20,7 +20,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
         display: 'flex',
         justifyContent: 'space-around',
         alignItems: 'center',
-        padding: '10px 8px 14px',
+        padding: '10px 6px 14px',
         background: 'rgba(5, 3, 12, 0.84)',
         backdropFilter: 'blur(36px) saturate(2.2)',
         WebkitBackdropFilter: 'blur(36px) saturate(2.2)',
@@ -41,7 +41,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
               flexDirection: 'column',
               alignItems: 'center',
               gap: 3,
-              padding: '8px 14px',
+              padding: '8px 6px',
               borderRadius: 14,
               border: 'none',
               background: isActive
@@ -53,7 +53,9 @@ export default function BottomNav({ activeTab, setActiveTab }) {
                 ? '0 0 18px rgba(255, 120, 30, 0.25)'
                 : 'none',
               transform: isActive ? 'translateY(-1px)' : 'translateY(0)',
-              minWidth: 52,
+              flex: '1 1 0',
+              minWidth: 0,
+              maxWidth: 92,
             }}
             onMouseEnter={e => {
               if (!isActive) {
@@ -71,7 +73,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
             <span
               className="material-symbols-outlined"
               style={{
-                fontSize: 24,
+                fontSize: 23,
                 color: isActive ? '#ff9933' : 'rgba(180, 150, 120, 0.65)',
                 filter: isActive ? 'drop-shadow(0 0 8px rgba(255,153,51,0.70))' : 'none',
                 fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0",
@@ -82,7 +84,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
               {item.icon}
             </span>
             <span style={{
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: isActive ? 700 : 500,
               letterSpacing: '0.04em',
               color: isActive ? 'rgba(255,180,100,0.95)' : 'rgba(160,135,110,0.60)',

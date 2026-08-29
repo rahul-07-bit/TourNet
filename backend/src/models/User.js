@@ -34,7 +34,6 @@ const socialLinksSchema = new Schema({
 }, { _id: false });
 
 const statsSchema = new Schema({
-  reelsPosted:    { type: Number, default: 0 },
   placesVisited:  { type: Number, default: 0 },
   followersCount: { type: Number, default: 0 },
   followingCount: { type: Number, default: 0 },
@@ -134,7 +133,6 @@ const userSchema = new Schema(
 
     // ── TourNet-specific ──────────────────────────────────────────────────────
     stats:           { type: statsSchema, default: () => ({}) },
-    savedReels:      [{ type: Schema.Types.ObjectId, ref: 'Reel' }],
     savedPlaces:     [{ type: Schema.Types.ObjectId, ref: 'Place' }],
     travelInterests: {
       type:    [String],
