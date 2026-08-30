@@ -328,6 +328,31 @@ function CommentsModal({ reel, user, onClose, onCountChange }) {
   );
 }
 
+function ReelPreviewCard({ reel, profile, position, onSelect }) {
+  if (!reel) return <div className={`reel-preview-card is-${position} is-empty`} aria-hidden="true" />;
+
+  return (
+    <button type="button" className={`reel-preview-card is-${position}`} onClick={onSelect} aria-label={`Open ${position} Reel`}>
+      <video
+        src={publicStorageUrl(reel.video_path)}
+        muted
+        playsInline
+        preload="metadata"
+        className="reel-preview-video"
+      />
+      <div className="reel-preview-shade" />
+      <div className="reel-preview-user">
+        {profile?.avatar_url ? <img className="avatar" src={profile.avatar_url} alt="" /> : <span className="avatar">{profileName(profile).charAt(0)}</span>}
+        <span><b>{profileName(profile)}</b><small>{username(profile, reel.user_id)}</small></span>
+      </div>
+      <div className="reel-preview-copy">
+        <b>{reel.caption || 'Travel Reel'}</b>
+        <small>{reel.location || 'Traveling'}</small>
+      </div>
+    </button>
+  );
+}
+
 export default function ReelsSection() {
   const { user } = useAuth();
   const [reels, setReels] = useState([]);
@@ -429,11 +454,20 @@ export default function ReelsSection() {
 
   const current = reels[active];
   const currentProfile = current ? profiles.get(current.user_id) : null;
+  const previous = active > 0 ? reels[active - 1] : null;
+  const next = active < reels.length - 1 ? reels[active + 1] : null;
+  const previousProfile = previous ? profiles.get(previous.user_id) : null;
+  const nextProfile = next ? profiles.get(next.user_id) : null;
 
   return (
     <section className="travel-reels" id="travel-reels">
+      <div className="reels-ambient" aria-hidden="true" />
       <header>
-        <div><span>TRAVEL STORIES</span><h2>TRAVEL REELS</h2><p>Discover the world through travelers' eyes.</p></div>
+        <div>
+          <span className="reels-eyebrow">TRAVEL STORIES</span>
+          <h2><span>TRAVEL</span> <em>REELS</em></h2>
+          <p>Discover the world through traveler's eyes.</p>
+        </div>
         <button className="reel-primary" type="button" onClick={() => user ? setShowCreate(true) : setMessage('Sign in to create a Reel.')}>
           <span className="material-symbols-outlined">add_circle</span>
           Create Reel
@@ -463,6 +497,7 @@ export default function ReelsSection() {
       {!loading && !loadError && current && (
         <>
           <div className="reel-stage">
+            <ReelPreviewCard reel={previous} profile={previousProfile} position="previous" onSelect={() => setActive((value) => Math.max(0, value - 1))} />
             <article className="reel-card">
               <ReelVideo reel={current} isActive />
               <div className="reel-gradient" />
@@ -487,11 +522,12 @@ export default function ReelsSection() {
                 }} aria-label={user?.id === current.user_id ? 'Delete Reel' : 'Report Reel'} title={user?.id === current.user_id ? 'Delete' : 'Report'}><span className="material-symbols-outlined">{user?.id === current.user_id ? 'delete' : 'more_horiz'}</span></button>
               </aside>
             </article>
+            <ReelPreviewCard reel={next} profile={nextProfile} position="next" onSelect={() => setActive((value) => Math.min(reels.length - 1, value + 1))} />
           </div>
           <div className="reel-nav">
-            <button disabled={active === 0} onClick={() => setActive((value) => value - 1)}>Previous</button>
+            <button disabled={active === 0} onClick={() => setActive((value) => value - 1)} aria-label="Previous Reel"><span className="material-symbols-outlined">arrow_back</span></button>
             <span>{active + 1} / {reels.length}</span>
-            <button disabled={active >= reels.length - 1} onClick={() => setActive((value) => value + 1)}>Next</button>
+            <button disabled={active >= reels.length - 1} onClick={() => setActive((value) => value + 1)} aria-label="Next Reel"><span className="material-symbols-outlined">arrow_forward</span></button>
           </div>
         </>
       )}
