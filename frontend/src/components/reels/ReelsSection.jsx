@@ -33,9 +33,10 @@ function username(profile, userId) {
 
 function ReelVideo({ reel, isActive }) {
   const videoRef = useRef(null);
+  const pointerStartRef = useRef(null);
+  const lastPointerToggleRef = useRef(0);
   const [url, setUrl] = useState('');
   const [muted, setMuted] = useState(true);
-  const [paused, setPaused] = useState(false);
   const [fast, setFast] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -64,26 +65,53 @@ function ReelVideo({ reel, isActive }) {
   useEffect(() => {
     if (!videoRef.current) return;
     videoRef.current.muted = muted;
-    videoRef.current.playbackRate = fast ? 2 : 1;
-    if (isActive && url && !paused) videoRef.current.play().catch(() => {});
+  }, [muted]);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    if (isActive && url) videoRef.current.play().catch(() => {});
     else videoRef.current.pause();
-  }, [fast, isActive, muted, paused, url]);
+  }, [isActive, url]);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    videoRef.current.playbackRate = fast ? 2 : 1;
+  }, [fast]);
 
   useEffect(() => {
     setFast(false);
-    setPaused(false);
     if (videoRef.current) videoRef.current.playbackRate = 1;
   }, [reel.id]);
 
-  const togglePlayback = () => {
+  const togglePlayback = async () => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
-      video.play().then(() => setPaused(false)).catch(() => {});
+      await video.play().catch(() => {});
     } else {
       video.pause();
-      setPaused(true);
     }
+  };
+
+  const handleVideoPointerUp = async (event) => {
+    event.stopPropagation();
+    if (event.pointerType === 'mouse') return;
+    const start = pointerStartRef.current;
+    pointerStartRef.current = null;
+    if (start) {
+      const movedX = Math.abs(event.clientX - start.x);
+      const movedY = Math.abs(event.clientY - start.y);
+      if (movedX > 10 || movedY > 10) return;
+    }
+    event.preventDefault();
+    lastPointerToggleRef.current = Date.now();
+    await togglePlayback();
+  };
+
+  const handleVideoClick = async (event) => {
+    event.stopPropagation();
+    if (Date.now() - lastPointerToggleRef.current < 500) return;
+    await togglePlayback();
   };
 
   const toggleSpeed = () => {
@@ -108,20 +136,23 @@ function ReelVideo({ reel, isActive }) {
         playsInline
         preload={isActive ? 'metadata' : 'none'}
         onCanPlay={() => setLoading(false)}
-        onClick={togglePlayback}
-        onPlay={() => setPaused(false)}
-        onPause={() => setPaused(true)}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          pointerStartRef.current = { x: event.clientX, y: event.clientY };
+        }}
+        onPointerUp={handleVideoPointerUp}
+        onClick={handleVideoClick}
         onError={(event) => {
           setError(true);
           if (import.meta.env.DEV) console.error('[TourNet Reels] video element error', event.currentTarget.error);
         }}
       />
       <div className="reel-video-controls">
-        <button type="button" className={fast ? 'is-active' : ''} onClick={(event) => { event.stopPropagation(); toggleSpeed(); }} aria-label={fast ? 'Return Reel to normal speed' : 'Play Reel at 2x speed'} title={fast ? '1x speed' : '2x speed'}>
+        <button type="button" className={fast ? 'is-active' : ''} onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); toggleSpeed(); }} aria-label={fast ? 'Return Reel to normal speed' : 'Play Reel at 2x speed'} title={fast ? '1x speed' : '2x speed'}>
           {fast ? '2x' : '1x'}
         </button>
       </div>
-      <button className="reel-mute" type="button" onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Unmute Reel' : 'Mute Reel'} title={muted ? 'Unmute' : 'Mute'}>
+      <button className="reel-mute" type="button" onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setMuted((value) => !value); }} aria-label={muted ? 'Unmute Reel' : 'Mute Reel'} title={muted ? 'Unmute' : 'Mute'}>
         <span className="material-symbols-outlined">{muted ? 'volume_off' : 'volume_up'}</span>
       </button>
     </>
