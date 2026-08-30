@@ -35,6 +35,8 @@ function ReelVideo({ reel, isActive }) {
   const videoRef = useRef(null);
   const [url, setUrl] = useState('');
   const [muted, setMuted] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const [fast, setFast] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -62,9 +64,35 @@ function ReelVideo({ reel, isActive }) {
   useEffect(() => {
     if (!videoRef.current) return;
     videoRef.current.muted = muted;
-    if (isActive && url) videoRef.current.play().catch(() => {});
+    videoRef.current.playbackRate = fast ? 2 : 1;
+    if (isActive && url && !paused) videoRef.current.play().catch(() => {});
     else videoRef.current.pause();
-  }, [isActive, muted, url]);
+  }, [fast, isActive, muted, paused, url]);
+
+  useEffect(() => {
+    setFast(false);
+    setPaused(false);
+    if (videoRef.current) videoRef.current.playbackRate = 1;
+  }, [reel.id]);
+
+  const togglePlayback = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      video.play().then(() => setPaused(false)).catch(() => {});
+    } else {
+      video.pause();
+      setPaused(true);
+    }
+  };
+
+  const toggleSpeed = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const nextFast = !fast;
+    video.playbackRate = nextFast ? 2 : 1;
+    setFast(nextFast);
+  };
 
   if (error) return <div className="reel-fallback">Video unavailable</div>;
 
@@ -80,12 +108,22 @@ function ReelVideo({ reel, isActive }) {
         playsInline
         preload={isActive ? 'metadata' : 'none'}
         onCanPlay={() => setLoading(false)}
-        onClick={(event) => event.currentTarget.paused ? event.currentTarget.play() : event.currentTarget.pause()}
+        onClick={togglePlayback}
+        onPlay={() => setPaused(false)}
+        onPause={() => setPaused(true)}
         onError={(event) => {
           setError(true);
           if (import.meta.env.DEV) console.error('[TourNet Reels] video element error', event.currentTarget.error);
         }}
       />
+      <div className="reel-video-controls">
+        <button type="button" onClick={togglePlayback} aria-label={paused ? 'Play Reel' : 'Pause Reel'} title={paused ? 'Play' : 'Pause'}>
+          <span className="material-symbols-outlined">{paused ? 'play_arrow' : 'pause'}</span>
+        </button>
+        <button type="button" className={fast ? 'is-active' : ''} onClick={toggleSpeed} aria-label={fast ? 'Return Reel to normal speed' : 'Play Reel at 2x speed'} title={fast ? '1x speed' : '2x speed'}>
+          {fast ? '2x' : '1x'}
+        </button>
+      </div>
       <button className="reel-mute" type="button" onClick={() => setMuted((value) => !value)} aria-label={muted ? 'Unmute Reel' : 'Mute Reel'} title={muted ? 'Unmute' : 'Mute'}>
         <span className="material-symbols-outlined">{muted ? 'volume_off' : 'volume_up'}</span>
       </button>
