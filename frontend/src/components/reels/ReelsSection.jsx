@@ -117,10 +117,7 @@ function ReelVideo({ reel, isActive }) {
         }}
       />
       <div className="reel-video-controls">
-        <button type="button" onClick={togglePlayback} aria-label={paused ? 'Play Reel' : 'Pause Reel'} title={paused ? 'Play' : 'Pause'}>
-          <span className="material-symbols-outlined">{paused ? 'play_arrow' : 'pause'}</span>
-        </button>
-        <button type="button" className={fast ? 'is-active' : ''} onClick={toggleSpeed} aria-label={fast ? 'Return Reel to normal speed' : 'Play Reel at 2x speed'} title={fast ? '1x speed' : '2x speed'}>
+        <button type="button" className={fast ? 'is-active' : ''} onClick={(event) => { event.stopPropagation(); toggleSpeed(); }} aria-label={fast ? 'Return Reel to normal speed' : 'Play Reel at 2x speed'} title={fast ? '1x speed' : '2x speed'}>
           {fast ? '2x' : '1x'}
         </button>
       </div>
