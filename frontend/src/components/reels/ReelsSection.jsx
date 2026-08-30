@@ -34,7 +34,6 @@ function username(profile, userId) {
 function ReelVideo({ reel, isActive }) {
   const videoRef = useRef(null);
   const pointerStartRef = useRef(null);
-  const lastPointerToggleRef = useRef(0);
   const [url, setUrl] = useState('');
   const [muted, setMuted] = useState(true);
   const [fast, setFast] = useState(false);
@@ -93,9 +92,8 @@ function ReelVideo({ reel, isActive }) {
     }
   };
 
-  const handleVideoPointerUp = async (event) => {
+  const handleVideoClick = async (event) => {
     event.stopPropagation();
-    if (event.pointerType === 'mouse') return;
     const start = pointerStartRef.current;
     pointerStartRef.current = null;
     if (start) {
@@ -103,14 +101,6 @@ function ReelVideo({ reel, isActive }) {
       const movedY = Math.abs(event.clientY - start.y);
       if (movedX > 10 || movedY > 10) return;
     }
-    event.preventDefault();
-    lastPointerToggleRef.current = Date.now();
-    await togglePlayback();
-  };
-
-  const handleVideoClick = async (event) => {
-    event.stopPropagation();
-    if (Date.now() - lastPointerToggleRef.current < 500) return;
     await togglePlayback();
   };
 
@@ -140,7 +130,6 @@ function ReelVideo({ reel, isActive }) {
           event.stopPropagation();
           pointerStartRef.current = { x: event.clientX, y: event.clientY };
         }}
-        onPointerUp={handleVideoPointerUp}
         onClick={handleVideoClick}
         onError={(event) => {
           setError(true);
