@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n server,client -c blue,magenta \"npm run server\" \"npm run client\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
     "client": "npm run dev --prefix frontend",
     "server": "npm run dev --prefix backend",
     "build": "npm run build --prefix frontend",
