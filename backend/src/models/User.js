@@ -55,8 +55,6 @@ const userSchema = new Schema(
 
     username: {
       type:      String,
-      unique:    true,
-      sparse:    true,      // allows null/undefined (set on first profile update)
       trim:      true,
       lowercase: true,
       match:     [/^[a-z0-9_]{3,30}$/, 'Username: 3-30 chars, letters / numbers / underscores only'],
@@ -65,7 +63,6 @@ const userSchema = new Schema(
     email: {
       type:      String,
       required:  [true, 'Email address is required'],
-      unique:    true,
       trim:      true,
       lowercase: true,
       match:     [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Enter a valid email address'],

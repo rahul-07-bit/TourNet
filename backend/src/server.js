@@ -323,9 +323,19 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 });
 
 if (process.env.VERCEL !== '1') {
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`[TourNet] Server running at http://localhost:${port}`);
     console.log(`Health: http://localhost:${port}/api/health`);
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`[TourNet] Port ${port} is already in use.`);
+      console.error(`Stop the other process using port ${port}, or set a different PORT in backend/.env.`);
+      process.exit(1);
+    }
+
+    throw error;
   });
 }
 
