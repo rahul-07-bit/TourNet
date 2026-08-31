@@ -17,6 +17,10 @@ import {
 
 const PAGE_SIZE = 10;
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+const PHONE_MEDIA_QUERY = '(max-width: 640px)';
+const SWIPE_THRESHOLD = 56;
+const SWIPE_DOMINANCE_RATIO = 1.15;
+const SWIPE_MAX_TAP_DRIFT = 10;
 
 function formatCount(value) {
   return Number(value || 0).toLocaleString();
@@ -67,10 +71,19 @@ function ReelVideo({ reel, isActive }) {
   }, [muted]);
 
   useEffect(() => {
-    if (!videoRef.current) return;
-    if (isActive && url) videoRef.current.play().catch(() => {});
-    else videoRef.current.pause();
+    const video = videoRef.current;
+    if (!video) return;
+    if (isActive && url) video.play().catch(() => {});
+    else video.pause();
   }, [isActive, url]);
+
+  useEffect(() => () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  }, []);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -195,13 +208,12 @@ function CreateReelModal({ onClose, onCreated, user }) {
     setPublishing(true);
     setError('');
     try {
-      setStatus('Uploading video...');
+      setStatus('Preparing upload...');
       const tags = hashtags
         .split(/[\s,]+/)
         .map((tag) => tag.replace(/^#/, '').trim())
         .filter(Boolean);
 
-      setStatus('Creating Reel...');
       const reel = await createReel({
         file: video,
         thumbnail,
@@ -210,6 +222,7 @@ function CreateReelModal({ onClose, onCreated, user }) {
         hashtags: tags,
         duration,
         userId: user.id,
+        onProgress: setStatus,
       });
 
       setStatus('Published.');
@@ -367,6 +380,7 @@ export default function ReelsSection() {
   const [commentsReel, setCommentsReel] = useState(null);
   const [swipeHintVisible, setSwipeHintVisible] = useState(true);
   const [swipeDirection, setSwipeDirection] = useState('');
+  const [isPhone, setIsPhone] = useState(false);
   const viewedRef = useRef(new Set());
   const swipeRef = useRef(null);
 
@@ -390,6 +404,18 @@ export default function ReelsSection() {
   };
 
   useEffect(() => { load(); }, [user?.id]);
+
+  useEffect(() => {
+    const query = window.matchMedia(PHONE_MEDIA_QUERY);
+    const update = () => setIsPhone(query.matches);
+    update();
+    if (query.addEventListener) {
+      query.addEventListener('change', update);
+      return () => query.removeEventListener('change', update);
+    }
+    query.addListener(update);
+    return () => query.removeListener(update);
+  }, []);
 
   const patchReel = (reelId, changes) => {
     setReels((previous) => previous.map((item) => item.id === reelId ? { ...item, ...changes } : item));
@@ -456,13 +482,20 @@ export default function ReelsSection() {
   };
 
   const goToReel = (nextIndex, direction = '') => {
+    if (!reels.length) return;
+    const boundedIndex = Math.max(0, Math.min(reels.length - 1, nextIndex));
+    if (boundedIndex === active) {
+      setSwipeHintVisible(false);
+      return;
+    }
     setSwipeHintVisible(false);
     setSwipeDirection(direction);
-    setActive(Math.max(0, Math.min(reels.length - 1, nextIndex)));
+    setActive(boundedIndex);
     window.setTimeout(() => setSwipeDirection(''), 260);
   };
 
   const beginSwipe = (event) => {
+    if (!isPhone || event.pointerType === 'mouse') return;
     if (event.target.closest('button, a, input, textarea, select, label')) return;
     swipeRef.current = {
       id: event.pointerId,
@@ -475,19 +508,30 @@ export default function ReelsSection() {
   const finishSwipe = (event) => {
     const start = swipeRef.current;
     swipeRef.current = null;
+    if (!isPhone || event.pointerType === 'mouse') return;
     if (!start || start.id !== event.pointerId) return;
     if (event.target.closest('button, a, input, textarea, select, label')) return;
 
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
     const elapsed = Math.max(performance.now() - start.t, 1);
-    const velocity = Math.abs(dy) / elapsed;
-    const isSwipe = Math.abs(dy) > 56 && Math.abs(dy) > Math.abs(dx) * 1.25 && velocity > 0.22;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    const dominantAxis = absY >= absX ? 'vertical' : 'horizontal';
+    const dominantDistance = dominantAxis === 'vertical' ? absY : absX;
+    const secondaryDistance = dominantAxis === 'vertical' ? absX : absY;
+    const velocity = dominantDistance / elapsed;
+    const isSwipe =
+      dominantDistance >= SWIPE_THRESHOLD &&
+      dominantDistance > secondaryDistance * SWIPE_DOMINANCE_RATIO &&
+      dominantDistance > SWIPE_MAX_TAP_DRIFT &&
+      velocity > 0.18;
 
     if (!isSwipe) return;
     event.preventDefault();
-    if (dy > 0 && active < reels.length - 1) goToReel(active + 1, 'next');
-    if (dy < 0 && active > 0) goToReel(active - 1, 'previous');
+
+    const wantsNext = dominantAxis === 'vertical' ? dy < 0 : dx < 0;
+    goToReel(active + (wantsNext ? 1 : -1), wantsNext ? 'next' : 'previous');
   };
 
   const current = reels[active];
@@ -535,19 +579,15 @@ export default function ReelsSection() {
       {!loading && !loadError && current && (
         <>
           <div className="reel-stage">
-            <ReelPreviewCard reel={previous} profile={previousProfile} position="previous" onSelect={() => setActive((value) => Math.max(0, value - 1))} />
+            {!isPhone && <ReelPreviewCard reel={previous} profile={previousProfile} position="previous" onSelect={() => setActive((value) => Math.max(0, value - 1))} />}
             <article
               className={`reel-card${swipeDirection ? ` is-swiping-${swipeDirection}` : ''}`}
               onPointerDownCapture={beginSwipe}
               onPointerUpCapture={finishSwipe}
               onPointerCancel={() => { swipeRef.current = null; }}
             >
-              <ReelVideo reel={current} isActive />
+              <ReelVideo key={current.id} reel={current} isActive />
               <div className="reel-gradient" />
-              <button className="reel-mobile-create" type="button" onClick={() => user ? setShowCreate(true) : setMessage('Sign in to create a Reel.')} aria-label="Create Reel">
-                <span className="material-symbols-outlined">add</span>
-                <small>Create<br />Reel</small>
-              </button>
               <div className="reel-creator">
                 {currentProfile?.avatar_url ? <img className="avatar" src={currentProfile.avatar_url} alt="" /> : <div className="avatar">{profileName(currentProfile).charAt(0)}</div>}
                 <div><b>{profileName(currentProfile)}</b><small>{username(currentProfile, current.user_id)} · {current.location || 'Traveling'}</small></div>
@@ -556,7 +596,7 @@ export default function ReelsSection() {
               {swipeHintVisible && (
                 <div className="reel-swipe-hint" aria-hidden="true">
                   <span className="material-symbols-outlined">keyboard_arrow_up</span>
-                  <small>Swipe up</small>
+                  <small>Swipe</small>
                   <span className="material-symbols-outlined">keyboard_arrow_down</span>
                 </div>
               )}
@@ -566,6 +606,7 @@ export default function ReelsSection() {
                 <small>{current.location || 'Traveling'} · {formatCount(current.views_count)} views</small>
               </div>
               <aside>
+                <button className="reel-action-create" type="button" onClick={() => user ? setShowCreate(true) : setMessage('Sign in to create a Reel.')} aria-label="Create Reel" title="Create Reel"><span className="material-symbols-outlined">add</span><small>Create</small></button>
                 <button type="button" className={liked.has(current.id) ? 'is-active' : ''} aria-label={liked.has(current.id) ? 'Unlike Reel' : 'Like Reel'} title={liked.has(current.id) ? 'Unlike' : 'Like'} onClick={() => toggle('reel_likes', current.id, liked, setLiked, 'likes_count')}><span className="material-symbols-outlined">favorite</span><small>{formatCount(current.likes_count)}</small></button>
                 <button type="button" aria-label="Open comments" title="Comments" onClick={() => setCommentsReel(current)}><span className="material-symbols-outlined">chat_bubble</span><small>{formatCount(current.comments_count)}</small></button>
                 <button type="button" className={saved.has(current.id) ? 'is-active' : ''} aria-label={saved.has(current.id) ? 'Unsave Reel' : 'Save Reel'} title={saved.has(current.id) ? 'Unsave' : 'Save'} onClick={() => toggle('reel_saves', current.id, saved, setSaved, 'saves_count')}><span className="material-symbols-outlined">bookmark</span><small>{formatCount(current.saves_count)}</small></button>
@@ -577,7 +618,7 @@ export default function ReelsSection() {
                 }} aria-label={user?.id === current.user_id ? 'Delete Reel' : 'Report Reel'} title={user?.id === current.user_id ? 'Delete' : 'Report'}><span className="material-symbols-outlined">{user?.id === current.user_id ? 'delete' : 'more_horiz'}</span></button>
               </aside>
             </article>
-            <ReelPreviewCard reel={next} profile={nextProfile} position="next" onSelect={() => setActive((value) => Math.min(reels.length - 1, value + 1))} />
+            {!isPhone && <ReelPreviewCard reel={next} profile={nextProfile} position="next" onSelect={() => setActive((value) => Math.min(reels.length - 1, value + 1))} />}
           </div>
           <div className="reel-nav">
             <button disabled={active === 0} onClick={() => setActive((value) => value - 1)} aria-label="Previous Reel"><span className="material-symbols-outlined">arrow_back</span></button>

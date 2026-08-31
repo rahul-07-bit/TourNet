@@ -108,10 +108,11 @@ export async function deleteComment(commentId, userId) {
   if (error) throw withReelError(error);
 }
 
-export async function createReel({ file, thumbnail, caption, location, hashtags, duration, userId }) {
+export async function createReel({ file, thumbnail, caption, location, hashtags, duration, userId, onProgress }) {
   const id = crypto.randomUUID();
   const videoPath = `${userId}/${id}/${storageFileName(file, 'video.mp4')}`;
 
+  onProgress?.('Uploading video...');
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
     .upload(videoPath, file, { contentType: file.type, upsert: false });
@@ -121,12 +122,14 @@ export async function createReel({ file, thumbnail, caption, location, hashtags,
   let thumbnailPath = null;
   if (thumbnail) {
     thumbnailPath = `${userId}/${id}/${storageFileName(thumbnail, 'thumbnail.jpg')}`;
+    onProgress?.('Uploading thumbnail...');
     const { error } = await supabase.storage
       .from(BUCKET)
       .upload(thumbnailPath, thumbnail, { contentType: thumbnail.type, upsert: false });
     if (error) throw error;
   }
 
+  onProgress?.('Creating Reel...');
   const { data, error } = await supabase
     .from('reels')
     .insert({

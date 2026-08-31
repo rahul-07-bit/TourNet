@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 // Curated 20 Indian Tourism Destinations across all 8 categories
 const INDIAN_DESTINATIONS = [
@@ -311,6 +311,429 @@ const CATEGORIES = [
   'Adventure Destinations'
 ];
 
+const DESTINATION_CONTEXT = {
+  'ind-varanasi': {
+    coordinates: { lat: 25.3176, lon: 82.9739 },
+    country: 'UP',
+    peakCrowdTime: '6:30 PM - 8:00 PM',
+    crowdWindowLabel: 'Evening Aarti',
+    healthRisk: { name: 'Acute Respiratory Infections (ARIs)', level: 'Moderate Risk', cases: 'High' },
+    interestingPoints: [
+      'One of the oldest spiritual rituals in India, performed daily since centuries.',
+      'Thousands of diyas are offered to Maa Ganga every evening.',
+      'Chants, bells, and Vedic hymns create a mesmerizing atmosphere.',
+      'Best place for photography - lights, fire, river & devotion together.',
+      'Believed to cleanse sins and bring peace, prosperity & good karma.'
+    ]
+  },
+  'ind-rishikesh-spirit': {
+    coordinates: { lat: 30.0869, lon: 78.2676 },
+    country: 'India',
+    peakCrowdTime: '7:00 AM - 11:00 AM and sunset near the ghats',
+    healthRisk: { name: 'River exposure and minor injury risk', level: 'Low to Moderate' },
+    interestingPoints: [
+      'Yoga centers and ghats are busiest around sunrise.',
+      'Laxman Jhula and Ram Jhula areas get compact foot traffic.',
+      'River activities should be booked with licensed operators.'
+    ]
+  },
+  'ind-ladakh': {
+    coordinates: { lat: 34.1526, lon: 77.5771 },
+    country: 'India',
+    peakCrowdTime: '10:00 AM - 3:00 PM in peak summer months',
+    healthRisk: { name: 'Altitude sickness risk', level: 'High' },
+    interestingPoints: [
+      'Acclimatization in Leh is important before high-pass travel.',
+      'Weather can shift quickly even on clear days.',
+      'Remote routes may have limited mobile network and medical access.'
+    ]
+  },
+  'ind-kashmir': {
+    coordinates: { lat: 34.0837, lon: 74.7973 },
+    country: 'India',
+    peakCrowdTime: '11:00 AM - 5:00 PM around lakefront and gardens',
+    healthRisk: { name: 'Cold exposure and respiratory irritation risk', level: 'Moderate' },
+    interestingPoints: [
+      'Dal Lake shikara points are busiest from late morning onward.',
+      'Layered clothing helps with sharp temperature changes.',
+      'Check local advisories before inter-district travel.'
+    ]
+  },
+  'ind-jaipur': {
+    coordinates: { lat: 26.9124, lon: 75.7873 },
+    country: 'India',
+    peakCrowdTime: '10:00 AM - 4:00 PM at forts and palaces',
+    healthRisk: { name: 'Heat exhaustion and dehydration risk', level: 'Moderate' },
+    interestingPoints: [
+      'Amber Fort queues rise sharply after mid-morning.',
+      'The old city is easier to explore early or near closing hours.',
+      'Carry water during hot, dry months.'
+    ]
+  },
+  'ind-goa': {
+    coordinates: { lat: 15.2993, lon: 74.1240 },
+    country: 'India',
+    peakCrowdTime: '4:00 PM - 9:00 PM near beaches and nightlife zones',
+    healthRisk: { name: 'Sunburn, dehydration, and mosquito-borne illness risk', level: 'Moderate' },
+    interestingPoints: [
+      'Beach roads become slow around sunset.',
+      'Lifeguarded beaches are safer for swimming.',
+      'Mosquito protection is useful after rain and at dusk.'
+    ]
+  },
+  'ind-andaman': {
+    coordinates: { lat: 11.7401, lon: 92.6586 },
+    country: 'India',
+    peakCrowdTime: '9:00 AM - 2:00 PM around ferries and beach activity slots',
+    healthRisk: { name: 'Sun exposure and water activity risk', level: 'Moderate' },
+    interestingPoints: [
+      'Ferry schedules strongly shape crowd flow.',
+      'Dive and snorkel visibility is usually best earlier in the day.',
+      'Reef-safe sunscreen helps protect marine areas.'
+    ]
+  },
+  'ind-meghalaya-forest': {
+    coordinates: { lat: 25.5788, lon: 91.8933 },
+    country: 'India',
+    peakCrowdTime: '10:00 AM - 3:00 PM near waterfalls and root bridges',
+    healthRisk: { name: 'Leech bites, slips, and monsoon infection risk', level: 'Moderate' },
+    interestingPoints: [
+      'Trails can become slick after sudden rain.',
+      'Living root bridge walks involve many steps and uneven paths.',
+      'Waterproof footwear is useful through most of the year.'
+    ]
+  },
+  'ind-kerala': {
+    coordinates: { lat: 9.4981, lon: 76.3388 },
+    country: 'India',
+    peakCrowdTime: '3:00 PM - 7:00 PM around houseboat check-ins and sunset',
+    healthRisk: { name: 'Mosquito-borne illness risk', level: 'Moderate' },
+    interestingPoints: [
+      'Backwater routes are calmest in the morning.',
+      'Houseboat boarding points bunch up before sunset cruises.',
+      'Repellent is useful near canals and paddy areas.'
+    ]
+  },
+  'ind-hampi': {
+    coordinates: { lat: 15.3350, lon: 76.4600 },
+    country: 'India',
+    peakCrowdTime: '8:00 AM - 12:00 PM at temple ruins',
+    healthRisk: { name: 'Heat exhaustion and dehydration risk', level: 'Moderate' },
+    interestingPoints: [
+      'The boulder landscape has limited shade in midday heat.',
+      'Sunrise and sunset are the most comfortable viewing windows.',
+      'Many ruins require walking over uneven stone surfaces.'
+    ]
+  },
+  'ind-jaipur-food': {
+    coordinates: { lat: 26.9239, lon: 75.8267 },
+    country: 'India',
+    peakCrowdTime: '5:00 PM - 9:00 PM in old-city food markets',
+    healthRisk: { name: 'Street-food stomach upset risk', level: 'Moderate' },
+    interestingPoints: [
+      'Johari Bazar and nearby lanes are most active after work hours.',
+      'Choose busy stalls with fast turnover.',
+      'Spice and heat can be intense in summer.'
+    ]
+  },
+  'ind-lucknow-food': {
+    coordinates: { lat: 26.8467, lon: 80.9462 },
+    country: 'India',
+    peakCrowdTime: '7:00 PM - 10:00 PM in old Lucknow food lanes',
+    healthRisk: { name: 'Street-food stomach upset risk', level: 'Moderate' },
+    interestingPoints: [
+      'Tunday Kababi and Aminabad lanes get dense at dinner time.',
+      'Late evenings have the liveliest food-trail atmosphere.',
+      'Keep small cash handy for older market lanes.'
+    ]
+  },
+  'ind-delhi-food': {
+    coordinates: { lat: 28.6506, lon: 77.2303 },
+    country: 'India',
+    peakCrowdTime: '12:00 PM - 4:00 PM and 6:00 PM - 9:00 PM',
+    healthRisk: { name: 'Air pollution and street-food stomach upset risk', level: 'Moderate to High' },
+    interestingPoints: [
+      'Chandni Chowk is dense around lunch and evening snack hours.',
+      'Metro access is usually easier than driving into the market.',
+      'People sensitive to air quality should check AQI before visiting.'
+    ]
+  },
+  'ind-amritsar-food': {
+    coordinates: { lat: 31.6340, lon: 74.8723 },
+    country: 'India',
+    peakCrowdTime: '8:00 AM - 11:00 AM and 6:00 PM - 9:00 PM',
+    healthRisk: { name: 'Rich-food digestive discomfort risk', level: 'Low to Moderate' },
+    interestingPoints: [
+      'Breakfast kulcha shops get busy early.',
+      'Golden Temple area footfall affects nearby food lanes.',
+      'Hydrate well when moving between markets in warm weather.'
+    ]
+  },
+  'ind-hyderabad-food': {
+    coordinates: { lat: 17.3616, lon: 78.4747 },
+    country: 'India',
+    peakCrowdTime: '1:00 PM - 3:00 PM and 8:00 PM - 11:00 PM',
+    healthRisk: { name: 'Spicy-food stomach irritation risk', level: 'Low to Moderate' },
+    interestingPoints: [
+      'Old-city biryani spots peak at lunch and late dinner.',
+      'Traffic around Charminar can slow sharply in the evening.',
+      'Plan extra time between food stops.'
+    ]
+  },
+  'ind-ladakh-adv': {
+    coordinates: { lat: 34.1642, lon: 77.5848 },
+    country: 'India',
+    peakCrowdTime: '8:00 AM - 2:00 PM on major pass routes',
+    healthRisk: { name: 'Altitude sickness and cold exposure risk', level: 'High' },
+    interestingPoints: [
+      'High passes can close quickly due to weather.',
+      'Buffer days help with acclimatization and road delays.',
+      'Fuel and repair stops are sparse outside main towns.'
+    ]
+  },
+  'ind-rishikesh-adv': {
+    coordinates: { lat: 30.1087, lon: 78.2948 },
+    country: 'India',
+    peakCrowdTime: '9:00 AM - 1:00 PM during rafting departures',
+    healthRisk: { name: 'Water activity injury risk', level: 'Moderate' },
+    interestingPoints: [
+      'Rafting batches cluster in the morning.',
+      'Certified guides and helmets are essential on rapids.',
+      'River levels vary by season and rainfall.'
+    ]
+  },
+  'ind-meghalaya-adv': {
+    coordinates: { lat: 25.2843, lon: 91.7256 },
+    country: 'India',
+    peakCrowdTime: '10:00 AM - 2:00 PM at cave entry points',
+    healthRisk: { name: 'Slips, low-light injury, and damp-cave infection risk', level: 'Moderate' },
+    interestingPoints: [
+      'Caves can be wet and narrow in sections.',
+      'Guided entry is safer for unfamiliar routes.',
+      'Carry a headlamp even for popular cave systems.'
+    ]
+  },
+  'ind-spiti-adv': {
+    coordinates: { lat: 32.2461, lon: 78.0172 },
+    country: 'India',
+    peakCrowdTime: '9:00 AM - 3:00 PM along monastery and pass routes',
+    healthRisk: { name: 'Altitude sickness and road fatigue risk', level: 'High' },
+    interestingPoints: [
+      'Distances take longer than maps suggest because roads are rough.',
+      'Remote stretches have limited fuel, food, and medical support.',
+      'Acclimatization matters before sleeping at higher villages.'
+    ]
+  },
+  'ind-manali-adv': {
+    coordinates: { lat: 32.2432, lon: 77.1892 },
+    country: 'India',
+    peakCrowdTime: '10:00 AM - 4:00 PM around Solang Valley and mall road',
+    healthRisk: { name: 'Cold exposure and snow-sport injury risk', level: 'Moderate' },
+    interestingPoints: [
+      'Adventure zones are busiest after breakfast.',
+      'Snow activities need proper boots and trained operators.',
+      'Traffic toward Solang can build quickly in holiday periods.'
+    ]
+  }
+};
+
+const WEATHER_CODES = {
+  0: 'Clear sky',
+  1: 'Mainly clear',
+  2: 'Partly cloudy',
+  3: 'Overcast',
+  45: 'Fog',
+  48: 'Depositing rime fog',
+  51: 'Light drizzle',
+  53: 'Moderate drizzle',
+  55: 'Dense drizzle',
+  61: 'Slight rain',
+  63: 'Moderate rain',
+  65: 'Heavy rain',
+  71: 'Slight snow',
+  73: 'Moderate snow',
+  75: 'Heavy snow',
+  80: 'Rain showers',
+  81: 'Moderate rain showers',
+  82: 'Violent rain showers',
+  95: 'Thunderstorm'
+};
+
+const toRadians = (degrees) => (degrees * Math.PI) / 180;
+
+const getDistanceKm = (from, to) => {
+  if (!from || !to) return null;
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(to.lat - from.lat);
+  const dLon = toRadians(to.lon - from.lon);
+  const lat1 = toRadians(from.lat);
+  const lat2 = toRadians(to.lat);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return Math.round(earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+};
+
+const getDestinationDetails = (destination) => ({
+  ...destination,
+  ...(DESTINATION_CONTEXT[destination.id] || {})
+});
+
+function CrowdBars() {
+  const bars = [16, 28, 22, 38, 54, 76, 100, 100, 68, 48, 34, 56, 60];
+
+  return (
+    <div className="mt-5">
+      <div className="h-24 flex items-end justify-center gap-2">
+        {bars.map((height, index) => (
+          <span
+            key={`${height}-${index}`}
+            className={`w-3 rounded-t-md ${index > 10 ? 'bg-white/10' : 'bg-gradient-to-t from-amber-500 to-orange-400'}`}
+            style={{ height: `${height}%` }}
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex justify-between text-[12px] font-bold text-white/70">
+        <span>4 PM</span>
+        <span>6 PM</span>
+        <span>8 PM</span>
+        <span>10 PM</span>
+      </div>
+    </div>
+  );
+}
+
+function DetailPanel({ icon, label, value, helper, tone = 'text-primary', children }) {
+  return (
+    <div className="p-5 min-h-[170px] border-white/10 md:border-r last:border-r-0">
+      <div className="flex items-start gap-3">
+        <span className={`material-symbols-outlined text-[21px] ${tone}`}>{icon}</span>
+        <div className="min-w-0">
+          <p className="text-[11px] text-white/80 uppercase font-extrabold tracking-wide">{label}</p>
+          {value && <p className="text-[20px] font-black text-white mt-5 leading-snug">{value}</p>}
+          {helper && <p className="text-[13px] text-white/70 mt-2 leading-relaxed">{helper}</p>}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function DestinationDetailModal({ destination, isBookmarked, onBookmarkToggle, onClose }) {
+  const details = useMemo(() => getDestinationDetails(destination), [destination]);
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationStatus, setLocationStatus] = useState('Requesting location...');
+  const [weather, setWeather] = useState({ status: 'loading', text: 'Loading weather...' });
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationStatus('Location unavailable');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({ lat: position.coords.latitude, lon: position.coords.longitude });
+        setLocationStatus('');
+      },
+      () => setLocationStatus('Location permission needed'),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+    );
+  }, [details.id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!details.coordinates) {
+      setWeather({ status: 'unavailable', text: 'Data unavailable' });
+      return () => { isMounted = false; };
+    }
+
+    setWeather({ status: 'loading', text: 'Loading weather...' });
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${details.coordinates.lat}&longitude=${details.coordinates.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`)
+      .then((response) => {
+        if (!response.ok) throw new Error('Weather request failed');
+        return response.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        const temperature = data?.current?.temperature_2m;
+        const humidity = data?.current?.relative_humidity_2m;
+        const wind = data?.current?.wind_speed_10m;
+        const code = data?.current?.weather_code;
+        const unit = data?.current_units?.temperature_2m || 'C';
+        const condition = WEATHER_CODES[code] || 'Condition unavailable';
+        setWeather({
+          status: temperature === undefined ? 'unavailable' : 'ready',
+          text: temperature === undefined ? 'Data unavailable' : `${Math.round(temperature)}${unit} | ${condition}`,
+          humidity: humidity === undefined ? null : Math.round(humidity),
+          wind: wind === undefined ? null : Math.round(wind)
+        });
+      })
+      .catch(() => {
+        if (isMounted) setWeather({ status: 'unavailable', text: 'Data unavailable' });
+      });
+
+    return () => { isMounted = false; };
+  }, [details.coordinates, details.id]);
+
+  const distanceKm = getDistanceKm(userLocation, details.coordinates);
+  const city = details.location?.split(',')[0]?.trim();
+  const locationText = [city, details.country].filter(Boolean).join(', ') || details.location;
+  const diseaseValue = details.healthRisk ? `${details.healthRisk.name} - ${details.healthRisk.level}` : 'Data unavailable';
+  const weatherParts = weather.text.split(' | ');
+  const weatherTemp = weatherParts[0]?.replace('°C', '°C') || weather.text;
+  const weatherCondition = weatherParts[1] || (weather.status === 'loading' ? 'Loading weather' : 'Forecast unavailable');
+  const pointIcons = ['temple_hindu', 'local_fire_department', 'music_note', 'photo_camera', 'star'];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-black/88 backdrop-blur-md">
+      <div className="relative w-full max-w-5xl max-h-[94dvh] overflow-y-auto no-scrollbar bg-[#040812] rounded-[34px] border border-slate-600/60 animate-fade-in-up shadow-[0_30px_100px_rgba(0,0,0,0.92),inset_0_1px_0_rgba(255,255,255,0.05)]">
+        <div className="relative min-h-[350px] sm:min-h-[430px] overflow-hidden rounded-t-[34px]">
+          <img src={details.image} alt={details.name} className="absolute inset-0 w-full h-full object-cover object-center" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12)_0%,rgba(4,8,18,0.28)_38%,rgba(4,8,18,0.98)_100%),linear-gradient(90deg,rgba(4,8,18,0.95)_0%,rgba(4,8,18,0.36)_48%,rgba(4,8,18,0.78)_100%)]"></div>
+          <button onClick={onClose} className="absolute top-5 right-5 sm:top-8 sm:right-8 w-14 h-14 sm:w-16 sm:h-16 bg-black/25 text-white hover:bg-black/55 rounded-full flex items-center justify-center transition-all border border-slate-400/35" aria-label="Close destination details">
+            <span className="material-symbols-outlined text-[34px]">close</span>
+          </button>
+          <div className="absolute left-5 right-5 bottom-10 sm:left-12 sm:right-12 sm:bottom-14">
+            <span className="inline-flex text-[12px] uppercase font-black tracking-widest px-5 py-1.5 rounded-full border border-amber-400/80 bg-black/40 text-[#ffc06e]">{details.category}</span>
+            <h3 className="mt-4 text-[34px] sm:text-[48px] font-black text-white leading-tight tracking-normal">{details.name}</h3>
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5 text-white/82">
+              <span className="flex items-center gap-2 text-[15px] sm:text-[17px] font-extrabold"><span className="material-symbols-outlined text-[25px] text-[#ffc06e]">location_on</span>{locationText}</span>
+              <span className="hidden sm:block w-px h-7 bg-white/22"></span>
+              <span className="flex items-center gap-2 text-[15px] sm:text-[17px] font-semibold"><span className="material-symbols-outlined text-[25px] text-cyan-300">near_me</span>{distanceKm ? `${distanceKm.toLocaleString()} km from you` : locationStatus || 'Data unavailable'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 sm:p-10 pt-0 sm:pt-0 space-y-7 text-left">
+          <div className="-mt-9 relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden rounded-[28px] border border-slate-600/50 bg-[#080d18]/92 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <DetailPanel icon="verified_user" label="Safety Index" tone="text-green-400"><div className="mt-9 text-center"><p className="text-[34px] font-black leading-none text-green-400">{details.safetyScore}</p><p className="mt-2 text-[17px] font-black text-green-400">Very Safe</p></div></DetailPanel>
+            <DetailPanel icon="healing" label="Diseases in Area" tone="text-rose-400"><div className="mt-4"><span className="inline-flex rounded-full bg-white/8 px-3 py-1 text-[13px] font-bold text-white/82">{details.healthRisk?.level || 'Data unavailable'}</span><p className="mt-4 text-[14px] font-semibold text-white/86">Most Common Disease</p><p className="mt-2 text-[18px] font-black leading-snug text-rose-300">{details.healthRisk?.name || diseaseValue}</p><p className="mt-4 text-[13px] font-semibold text-white/80">Cases reported: <span className="font-black text-rose-300">{details.healthRisk?.cases || 'Data unavailable'}</span></p><button className="mt-4 inline-flex h-11 items-center gap-2 rounded-xl border border-purple-500/55 px-5 text-[13px] font-black text-purple-300">See All <span className="material-symbols-outlined text-[18px]">chevron_right</span></button></div></DetailPanel>
+            <DetailPanel icon="groups" label="Max Crowd Time" tone="text-amber-400"><p className="mt-8 text-center text-[22px] font-black leading-snug text-amber-400">{details.peakCrowdTime || 'Data unavailable'}</p><p className="mt-2 text-center text-[14px] font-bold text-white/80">({details.crowdWindowLabel || details.crowdLevel || 'Live'})</p><CrowdBars /></DetailPanel>
+            <DetailPanel icon="partly_cloudy_day" label="Weather" tone="text-cyan-300"><div className="mt-8 text-center"><p className="text-[34px] font-black leading-none text-cyan-300">{weatherTemp}</p><p className="mt-3 text-[16px] font-bold text-white">{weatherCondition}</p><div className="mt-6 space-y-2 text-left text-[13px] text-white/80"><p>Humidity: <span className="ml-3 font-bold text-white">{weather.humidity ?? '--'}%</span></p><p>Wind: <span className="ml-8 font-bold text-white">{weather.wind ?? '--'} km/h</span></p></div><button className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl border border-cyan-300/45 px-4 text-[13px] font-black text-cyan-200">View Forecast <span className="material-symbols-outlined text-[18px]">chevron_right</span></button></div></DetailPanel>
+          </div>
+
+          <div>
+            <h4 className="text-[20px] font-black uppercase text-[#ffc06e] tracking-wide mb-3">Description</h4>
+            <p className="text-white/86 text-[18px] sm:text-[21px] leading-relaxed max-w-4xl">{details.description || 'Data unavailable'}</p>
+            <div className="mt-5 h-px w-32 bg-white/15"></div>
+          </div>
+
+          <div>
+            <h4 className="text-[20px] font-black uppercase text-[#ffc06e] tracking-wide mb-4">Interesting Points</h4>
+            {details.interestingPoints?.length ? (<div className="divide-y divide-white/12">{details.interestingPoints.map((point, index) => (<div key={point} className="flex items-center gap-5 py-4"><span className="material-symbols-outlined text-[29px] text-amber-400 mt-0.5">{pointIcons[index % pointIcons.length]}</span><p className="text-[17px] sm:text-[20px] text-white/84 leading-relaxed">{point}</p></div>))}</div>) : (<p className="text-[13px] text-on-surface-variant/70">Data unavailable</p>)}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <button onClick={(e) => onBookmarkToggle(e, details.id)} className={`h-20 px-7 rounded-2xl flex items-center justify-center gap-2 border transition-all duration-300 ${isBookmarked ? 'bg-primary-container/20 text-primary border-primary-container/30 shadow-[0_0_12px_rgba(255,153,51,0.2)]' : 'bg-[#0b101b] text-white/80 border-slate-600/45 hover:bg-white/5'}`} aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark destination'}><span className="material-symbols-outlined text-[34px]" style={{ fontVariationSettings: isBookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span></button>
+            <button onClick={() => { alert(`Routing generated for ${details.name}!`); onClose(); }} className="flex-1 h-20 bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-[#321700] rounded-2xl text-[25px] sm:text-[30px] font-black hover:brightness-110 active:scale-[0.98] shadow-[0_14px_35px_rgba(255,153,51,0.28)] transition-all flex items-center justify-center gap-4"><span className="material-symbols-outlined text-[34px]">map</span>Plan Safe Journey</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 export default function Explore() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -470,107 +893,16 @@ export default function Explore() {
         })}
       </div>
 
-      {/* Cinematic Modal details for Indian Destinations */}
+      {/* Dynamic detail modal for selected Explore destination */}
       {selectedDest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-          <div className="relative w-full max-w-lg glass rounded-3xl overflow-hidden border border-white/15 animate-fade-in-up shadow-[0_20px_50px_rgba(0,0,0,0.85)]">
-            
-            {/* Header Image */}
-            <div className="h-60 relative">
-              <img
-                src={selectedDest.image}
-                alt={selectedDest.name}
-                className="w-full h-full object-cover object-center"
-              />
-              <div className="absolute inset-0 card-gradient-overlay"></div>
-              
-              {/* Close */}
-              <button
-                onClick={() => setSelectedDest(null)}
-                className="absolute top-4 right-4 w-9 h-9 bg-black/50 text-white hover:bg-black/80 hover:scale-105 rounded-full flex items-center justify-center transition-all border border-white/10"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-
-              {/* Title Overlay */}
-              <div className="absolute bottom-6 left-6 right-6">
-                <span className="text-[10px] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded-full border border-primary/30 bg-black/50 text-primary">
-                  {selectedDest.category}
-                </span>
-                <h3 className="text-headline-sm font-headline-sm text-white mt-2 leading-tight">
-                  {selectedDest.name}
-                </h3>
-                <div className="flex items-center gap-1.5 text-on-surface-variant/90 mt-1">
-                  <span className="material-symbols-outlined text-[16px] text-primary" data-icon="location_on">location_on</span>
-                  <span className="text-[12px] font-semibold">{selectedDest.location}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Specs & Description */}
-            <div className="p-6 space-y-5 text-left">
-              
-              {/* Performance Stats */}
-              <div className="grid grid-cols-3 gap-3 py-3 px-4 glass rounded-2xl border-white/5">
-                <div className="text-center">
-                  <p className="text-[9px] text-on-surface-variant/60 uppercase font-bold">Safety Index</p>
-                  <div className="flex items-center justify-center gap-1 mt-1 text-secondary">
-                    <span className="material-symbols-outlined text-[14px]">verified_user</span>
-                    <span className="text-[13px] font-bold">{selectedDest.safetyScore}</span>
-                  </div>
-                </div>
-                <div className="text-center border-x border-white/10">
-                  <p className="text-[9px] text-on-surface-variant/60 uppercase font-bold">Crowd Level</p>
-                  <div className="flex items-center justify-center gap-1 mt-1 text-cyan-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                    <span className="text-[13px] font-bold">{selectedDest.crowdLevel}</span>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <p className="text-[9px] text-on-surface-variant/60 uppercase font-bold">Ambient factor</p>
-                  <p className="text-[11px] font-bold text-amber-400 mt-1.5 truncate">
-                    {selectedDest.ambientSpec.split(':')[1] || selectedDest.ambientSpec}
-                  </p>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <h4 className="text-[12px] font-bold uppercase text-primary tracking-wider mb-1.5">Description</h4>
-                <p className="text-on-surface-variant text-[14px] leading-relaxed">
-                  {selectedDest.description}
-                </p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-4 pt-2">
-                <button
-                  onClick={(e) => handleBookmarkToggle(e, selectedDest.id)}
-                  className={`px-4 rounded-xl flex items-center justify-center border transition-all duration-300 ${
-                    bookmarked[selectedDest.id]
-                      ? 'bg-primary-container/20 text-primary border-primary-container/30 shadow-[0_0_12px_rgba(255,153,51,0.2)]'
-                      : 'glass text-white/80 border-white/10 hover:bg-white/5'
-                  }`}
-                >
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: bookmarked[selectedDest.id] ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    alert(`Routing generated for ${selectedDest.name}! 🗺️`);
-                    setSelectedDest(null);
-                  }}
-                  className="flex-1 bg-gradient-to-r from-primary-container to-amber-500 text-on-primary-container py-3 rounded-xl font-bold hover:brightness-110 active:scale-95 shadow-[0_4px_15px_rgba(255,153,51,0.35)] transition-all flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-[20px]">map</span>
-                  Plan Safe Journey
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
+        <DestinationDetailModal
+          destination={selectedDest}
+          isBookmarked={!!bookmarked[selectedDest.id]}
+          onBookmarkToggle={handleBookmarkToggle}
+          onClose={() => setSelectedDest(null)}
+        />
       )}
     </section>
   );
 }
+

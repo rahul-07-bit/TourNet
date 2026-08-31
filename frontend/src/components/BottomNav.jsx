@@ -11,6 +11,7 @@ const NAV_ITEMS = [
 export default function BottomNav({ activeTab, setActiveTab }) {
   return (
     <nav
+      className="bottom-nav"
       style={{
         position: 'fixed',
         bottom: 0,
