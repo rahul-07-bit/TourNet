@@ -365,7 +365,10 @@ export default function ReelsSection() {
   const [message, setMessage] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [commentsReel, setCommentsReel] = useState(null);
+  const [swipeHintVisible, setSwipeHintVisible] = useState(true);
+  const [swipeDirection, setSwipeDirection] = useState('');
   const viewedRef = useRef(new Set());
+  const swipeRef = useRef(null);
 
   const load = async () => {
     setLoading(true);
@@ -452,6 +455,41 @@ export default function ReelsSection() {
     }
   };
 
+  const goToReel = (nextIndex, direction = '') => {
+    setSwipeHintVisible(false);
+    setSwipeDirection(direction);
+    setActive(Math.max(0, Math.min(reels.length - 1, nextIndex)));
+    window.setTimeout(() => setSwipeDirection(''), 260);
+  };
+
+  const beginSwipe = (event) => {
+    if (event.target.closest('button, a, input, textarea, select, label')) return;
+    swipeRef.current = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      t: performance.now(),
+    };
+  };
+
+  const finishSwipe = (event) => {
+    const start = swipeRef.current;
+    swipeRef.current = null;
+    if (!start || start.id !== event.pointerId) return;
+    if (event.target.closest('button, a, input, textarea, select, label')) return;
+
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    const elapsed = Math.max(performance.now() - start.t, 1);
+    const velocity = Math.abs(dy) / elapsed;
+    const isSwipe = Math.abs(dy) > 56 && Math.abs(dy) > Math.abs(dx) * 1.25 && velocity > 0.22;
+
+    if (!isSwipe) return;
+    event.preventDefault();
+    if (dy > 0 && active < reels.length - 1) goToReel(active + 1, 'next');
+    if (dy < 0 && active > 0) goToReel(active - 1, 'previous');
+  };
+
   const current = reels[active];
   const currentProfile = current ? profiles.get(current.user_id) : null;
   const previous = active > 0 ? reels[active - 1] : null;
@@ -498,13 +536,30 @@ export default function ReelsSection() {
         <>
           <div className="reel-stage">
             <ReelPreviewCard reel={previous} profile={previousProfile} position="previous" onSelect={() => setActive((value) => Math.max(0, value - 1))} />
-            <article className="reel-card">
+            <article
+              className={`reel-card${swipeDirection ? ` is-swiping-${swipeDirection}` : ''}`}
+              onPointerDownCapture={beginSwipe}
+              onPointerUpCapture={finishSwipe}
+              onPointerCancel={() => { swipeRef.current = null; }}
+            >
               <ReelVideo reel={current} isActive />
               <div className="reel-gradient" />
+              <button className="reel-mobile-create" type="button" onClick={() => user ? setShowCreate(true) : setMessage('Sign in to create a Reel.')} aria-label="Create Reel">
+                <span className="material-symbols-outlined">add</span>
+                <small>Create<br />Reel</small>
+              </button>
               <div className="reel-creator">
                 {currentProfile?.avatar_url ? <img className="avatar" src={currentProfile.avatar_url} alt="" /> : <div className="avatar">{profileName(currentProfile).charAt(0)}</div>}
                 <div><b>{profileName(currentProfile)}</b><small>{username(currentProfile, current.user_id)} · {current.location || 'Traveling'}</small></div>
+                <span className="reel-follow">Follow</span>
               </div>
+              {swipeHintVisible && (
+                <div className="reel-swipe-hint" aria-hidden="true">
+                  <span className="material-symbols-outlined">keyboard_arrow_up</span>
+                  <small>Swipe up</small>
+                  <span className="material-symbols-outlined">keyboard_arrow_down</span>
+                </div>
+              )}
               <div className="reel-copy">
                 <p>{current.caption}</p>
                 <small>{(current.hashtags || []).map((tag) => `#${tag}`).join(' ')}</small>
@@ -528,6 +583,11 @@ export default function ReelsSection() {
             <button disabled={active === 0} onClick={() => setActive((value) => value - 1)} aria-label="Previous Reel"><span className="material-symbols-outlined">arrow_back</span></button>
             <span>{active + 1} / {reels.length}</span>
             <button disabled={active >= reels.length - 1} onClick={() => setActive((value) => value + 1)} aria-label="Next Reel"><span className="material-symbols-outlined">arrow_forward</span></button>
+          </div>
+          <div className="reel-mobile-dots" aria-label={`Reel ${active + 1} of ${reels.length}`}>
+            {reels.slice(0, PAGE_SIZE).map((reel, index) => (
+              <button key={reel.id} type="button" className={index === active ? 'is-active' : ''} onClick={() => goToReel(index)} aria-label={`Open Reel ${index + 1}`} />
+            ))}
           </div>
         </>
       )}
