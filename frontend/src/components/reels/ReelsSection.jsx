@@ -542,7 +542,7 @@ export default function ReelsSection() {
   const nextProfile = next ? profiles.get(next.user_id) : null;
 
   return (
-    <section className="travel-reels" id="travel-reels">
+    <section className="travel-reels" id="travel-reels" data-deploy-sync="reels-2026-09-01">
       <div className="reels-ambient" aria-hidden="true" />
       <header>
         <div>

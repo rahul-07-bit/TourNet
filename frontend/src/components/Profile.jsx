@@ -42,7 +42,7 @@ export default function Profile() {
   ];
 
   return (
-    <section className="profile-page animate-fade-in-up">
+    <section className="profile-page animate-fade-in-up" data-deploy-sync="profile-2026-09-01">
       <div className="profile-bg profile-bg-purple" />
       <div className="profile-bg profile-bg-orange" />
 

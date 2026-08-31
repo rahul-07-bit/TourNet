@@ -26,7 +26,7 @@ const toneClasses = {
 
 export default function SafetyHub() {
   return (
-    <section className="container mx-auto mt-stack-lg px-container-margin pb-[calc(112px+env(safe-area-inset-bottom))]">
+    <section className="container mx-auto mt-stack-lg px-container-margin pb-[calc(112px+env(safe-area-inset-bottom))]" data-deploy-sync="safety-2026-09-01">
       <div className="relative overflow-hidden rounded-[28px] border border-red-300/18 bg-[radial-gradient(circle_at_14%_50%,rgba(255,55,67,0.28),transparent_28%),linear-gradient(135deg,rgba(80,8,18,0.84),rgba(18,8,18,0.94)_54%,rgba(8,7,14,0.96))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-7 lg:p-10">
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.04),transparent_34%,rgba(255,71,87,0.05))]" />
         <div className="relative grid items-center gap-7 lg:grid-cols-[220px_1fr_360px] xl:grid-cols-[250px_1fr_420px]">
