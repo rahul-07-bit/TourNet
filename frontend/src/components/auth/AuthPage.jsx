@@ -262,28 +262,7 @@ function LoginPage({ onSwitch, flashMessage }) {
   const [success,  setSuccess]  = useState('');
   const [cooldown, setCooldown] = useCountdown(0);
 
-  // Auto-trigger Gmail OTP sending for Google authentication redirect callback
-  useEffect(() => {
-    const isGoogleTriggered = sessionStorage.getItem('tournet_google_otp_triggered') === 'true';
-    if (isGoogleTriggered) {
-      const pendingEmail = sessionStorage.getItem('tournet_google_pending_email');
-      const pendingName = sessionStorage.getItem('tournet_google_pending_name') || '';
-      if (pendingEmail) {
-        setEmail(pendingEmail);
-        sendOtp(pendingEmail, pendingName)
-          .then(() => {
-            setSuccess('OTP has been sent to your registered email address.');
-            setStep(2);
-          })
-          .catch(err => {
-            setApiError(err.message);
-          })
-          .finally(() => {
-            sessionStorage.removeItem('tournet_google_otp_triggered');
-          });
-      }
-    }
-  }, [sendOtp]);
+
 
   const validateEmail = () => {
     const e = {};

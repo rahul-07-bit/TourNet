@@ -579,40 +579,124 @@ const getDestinationDetails = (destination) => ({
   ...(DESTINATION_CONTEXT[destination.id] || {})
 });
 
-function CrowdBars() {
-  const bars = [16, 28, 22, 38, 54, 76, 100, 100, 68, 48, 34, 56, 60];
+// ─── Crowd bar chart: derives time window from peakCrowdTime string ───────────
+function buildCrowdBars(peakCrowdTime) {
+  // Attempt to parse the first time in the peakCrowdTime string (e.g. "6:30 PM - 8:00 PM")
+  if (!peakCrowdTime) return { bars: [], labels: [] };
+
+  // Generic 24-slot bar profile (midnight → 11 PM, 30-min buckets)
+  // peaks at whatever hour range is specified
+  const parseHour = (str) => {
+    const match = str.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
+    if (!match) return null;
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2] || '0', 10);
+    const period = match[3].toUpperCase();
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    return h + m / 60;
+  };
+
+  // Extract start/end hours from the string
+  const timeMatches = peakCrowdTime.match(/(\d{1,2}(?::\d{2})?\s*(?:AM|PM))/gi) || [];
+  const startHour = timeMatches[0] ? parseHour(timeMatches[0]) : null;
+  const endHour   = timeMatches[1] ? parseHour(timeMatches[1]) : null;
+
+  // Build 8 bars across a 4-hour window centred on the peak
+  const windowStart = startHour !== null ? Math.max(0, startHour - 1) : 10;
+  const windowEnd   = endHour   !== null ? Math.min(24, endHour   + 1) : 14;
+  const step = (windowEnd - windowStart) / 8;
+
+  const labels = [];
+  const bars   = [];
+  for (let i = 0; i < 8; i++) {
+    const h = windowStart + i * step;
+    const hour = Math.floor(h) % 24;
+    const ampm = hour < 12 ? 'AM' : 'PM';
+    const h12  = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    labels.push(`${h12} ${ampm}`);
+
+    // Height: ramp up to peak in the middle, fade after
+    const relPos = i / 7; // 0 → 1 across the window
+    // Bell-ish curve peaking between index 3 and 5
+    const peakPos = 0.55;
+    const spread  = 0.32;
+    const gauss   = Math.exp(-Math.pow((relPos - peakPos) / spread, 2) / 2);
+    bars.push(Math.round(18 + gauss * 82));
+  }
+
+  // Mark bars outside the true peak as dimmer (after the last label)
+  const trueStartIdx = startHour !== null ? Math.round((startHour - windowStart) / step) : 2;
+  const trueEndIdx   = endHour   !== null ? Math.round((endHour   - windowStart) / step) : 5;
+
+  return { bars, labels, trueStartIdx: Math.max(0, trueStartIdx), trueEndIdx: Math.min(7, trueEndIdx) };
+}
+
+function CrowdBars({ peakCrowdTime }) {
+  const { bars, labels, trueStartIdx, trueEndIdx } = buildCrowdBars(peakCrowdTime);
+
+  if (!bars.length) {
+    return <p className="mt-4 text-[13px] text-white/50">Crowd data unavailable</p>;
+  }
 
   return (
-    <div className="mt-5">
-      <div className="h-24 flex items-end justify-center gap-2">
-        {bars.map((height, index) => (
-          <span
-            key={`${height}-${index}`}
-            className={`w-3 rounded-t-md ${index > 10 ? 'bg-white/10' : 'bg-gradient-to-t from-amber-500 to-orange-400'}`}
-            style={{ height: `${height}%` }}
-          />
-        ))}
+    <div className="mt-4">
+      <div className="h-20 flex items-end justify-center gap-[5px]">
+        {bars.map((height, index) => {
+          const isPeak = index >= trueStartIdx && index <= trueEndIdx;
+          return (
+            <span
+              key={index}
+              className={`flex-1 rounded-t-sm transition-all duration-300 ${
+                isPeak
+                  ? 'bg-gradient-to-t from-amber-500 to-orange-300'
+                  : 'bg-white/15'
+              }`}
+              style={{ height: `${height}%` }}
+            />
+          );
+        })}
       </div>
-      <div className="mt-2 flex justify-between text-[12px] font-bold text-white/70">
-        <span>4 PM</span>
-        <span>6 PM</span>
-        <span>8 PM</span>
-        <span>10 PM</span>
+      <div className="mt-1.5 flex justify-between text-[10px] font-bold text-white/55">
+        <span>{labels[0]}</span>
+        <span>{labels[Math.floor(labels.length / 2)]}</span>
+        <span>{labels[labels.length - 1]}</span>
       </div>
     </div>
   );
 }
 
-function DetailPanel({ icon, label, value, helper, tone = 'text-primary', children }) {
+// ─── Derive a safety label from the numeric part of a safetyScore string ──────
+function getSafetyLabel(score) {
+  if (!score) return 'Unknown';
+  const num = parseFloat(score);
+  if (isNaN(num)) return 'Unknown';
+  if (num >= 9.5) return 'Very Safe';
+  if (num >= 9.0) return 'Safe';
+  if (num >= 8.0) return 'Mostly Safe';
+  if (num >= 7.0) return 'Exercise Caution';
+  return 'Use Caution';
+}
+
+// ─── Category-aware interesting-point icons ───────────────────────────────────
+const CATEGORY_ICONS = {
+  'Spiritual India':       ['temple_hindu', 'local_fire_department', 'music_note', 'photo_camera', 'star'],
+  'Mountains & Himalayas': ['landscape', 'cloudy_snowing', 'hiking', 'photo_camera', 'explore'],
+  'Royal Heritage':        ['account_balance', 'diamond', 'photo_camera', 'history_edu', 'star'],
+  'Beaches & Islands':     ['beach_access', 'water', 'scuba_diving', 'photo_camera', 'sunny'],
+  'Forest & Wildlife':     ['park', 'nature', 'photo_camera', 'water_drop', 'eco'],
+  'Hidden Gems':           ['explore', 'photo_camera', 'landscape', 'star', 'history_edu'],
+  'Food Trails':           ['restaurant', 'local_dining', 'emoji_food_beverage', 'photo_camera', 'star'],
+  'Adventure Destinations':['hiking', 'sports_motorsports', 'explore', 'photo_camera', 'bolt'],
+};
+const DEFAULT_ICONS = ['explore', 'photo_camera', 'star', 'location_on', 'info'];
+
+function DetailPanel({ icon, label, tone = 'text-primary', children }) {
   return (
-    <div className="p-5 min-h-[170px] border-white/10 md:border-r last:border-r-0">
-      <div className="flex items-start gap-3">
-        <span className={`material-symbols-outlined text-[21px] ${tone}`}>{icon}</span>
-        <div className="min-w-0">
-          <p className="text-[11px] text-white/80 uppercase font-extrabold tracking-wide">{label}</p>
-          {value && <p className="text-[20px] font-black text-white mt-5 leading-snug">{value}</p>}
-          {helper && <p className="text-[13px] text-white/70 mt-2 leading-relaxed">{helper}</p>}
-        </div>
+    <div className="p-5 min-h-[190px] border-white/10 md:border-r last:border-r-0 flex flex-col">
+      <div className="flex items-center gap-2.5 mb-1">
+        <span className={`material-symbols-outlined text-[20px] ${tone}`}>{icon}</span>
+        <p className="text-[11px] text-white/75 uppercase font-extrabold tracking-widest">{label}</p>
       </div>
       {children}
     </div>
@@ -623,17 +707,31 @@ function DestinationDetailModal({ destination, isBookmarked, onBookmarkToggle, o
   const details = useMemo(() => getDestinationDetails(destination), [destination]);
   const [userLocation, setUserLocation] = useState(null);
   const [locationStatus, setLocationStatus] = useState('Requesting location...');
-  const [weather, setWeather] = useState({ status: 'loading', text: 'Loading weather...' });
+  const [weather, setWeather] = useState({ status: 'loading' });
 
+  // ── Lock body scroll while modal is open ──────────────────────────────────
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // ── Close on Escape key ───────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // ── Geolocation ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!navigator.geolocation) {
       setLocationStatus('Location unavailable');
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({ lat: position.coords.latitude, lon: position.coords.longitude });
+      (pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
         setLocationStatus('');
       },
       () => setLocationStatus('Location permission needed'),
@@ -641,93 +739,273 @@ function DestinationDetailModal({ destination, isBookmarked, onBookmarkToggle, o
     );
   }, [details.id]);
 
+  // ── Live weather from Open-Meteo ──────────────────────────────────────────
   useEffect(() => {
-    let isMounted = true;
-
+    let mounted = true;
     if (!details.coordinates) {
-      setWeather({ status: 'unavailable', text: 'Data unavailable' });
-      return () => { isMounted = false; };
+      setWeather({ status: 'unavailable' });
+      return () => { mounted = false; };
     }
-
-    setWeather({ status: 'loading', text: 'Loading weather...' });
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${details.coordinates.lat}&longitude=${details.coordinates.lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`)
-      .then((response) => {
-        if (!response.ok) throw new Error('Weather request failed');
-        return response.json();
-      })
+    setWeather({ status: 'loading' });
+    const { lat, lon } = details.coordinates;
+    fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`
+    )
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((data) => {
-        if (!isMounted) return;
-        const temperature = data?.current?.temperature_2m;
+        if (!mounted) return;
+        const temp     = data?.current?.temperature_2m;
         const humidity = data?.current?.relative_humidity_2m;
-        const wind = data?.current?.wind_speed_10m;
-        const code = data?.current?.weather_code;
-        const unit = data?.current_units?.temperature_2m || 'C';
-        const condition = WEATHER_CODES[code] || 'Condition unavailable';
-        setWeather({
-          status: temperature === undefined ? 'unavailable' : 'ready',
-          text: temperature === undefined ? 'Data unavailable' : `${Math.round(temperature)}${unit} | ${condition}`,
-          humidity: humidity === undefined ? null : Math.round(humidity),
-          wind: wind === undefined ? null : Math.round(wind)
-        });
+        const wind     = data?.current?.wind_speed_10m;
+        const code     = data?.current?.weather_code;
+        // Normalise unit: "°C" or "°F"
+        const rawUnit  = data?.current_units?.temperature_2m ?? '°C';
+        const unit     = rawUnit.includes('F') ? '°F' : '°C';
+        const condition = WEATHER_CODES[code] ?? 'Condition unavailable';
+        setWeather(
+          temp === undefined
+            ? { status: 'unavailable' }
+            : {
+                status: 'ready',
+                temp: `${Math.round(temp)}${unit}`,
+                condition,
+                humidity: humidity != null ? Math.round(humidity) : null,
+                wind:     wind     != null ? Math.round(wind)     : null,
+              }
+        );
       })
-      .catch(() => {
-        if (isMounted) setWeather({ status: 'unavailable', text: 'Data unavailable' });
-      });
-
-    return () => { isMounted = false; };
+      .catch(() => { if (mounted) setWeather({ status: 'unavailable' }); });
+    return () => { mounted = false; };
   }, [details.coordinates, details.id]);
 
-  const distanceKm = getDistanceKm(userLocation, details.coordinates);
-  const city = details.location?.split(',')[0]?.trim();
+  // ── Derived display values ────────────────────────────────────────────────
+  const distanceKm   = getDistanceKm(userLocation, details.coordinates);
+  const city         = details.location?.split(',')[0]?.trim();
   const locationText = [city, details.country].filter(Boolean).join(', ') || details.location;
-  const diseaseValue = details.healthRisk ? `${details.healthRisk.name} - ${details.healthRisk.level}` : 'Data unavailable';
-  const weatherParts = weather.text.split(' | ');
-  const weatherTemp = weatherParts[0]?.replace('°C', '°C') || weather.text;
-  const weatherCondition = weatherParts[1] || (weather.status === 'loading' ? 'Loading weather' : 'Forecast unavailable');
-  const pointIcons = ['temple_hindu', 'local_fire_department', 'music_note', 'photo_camera', 'star'];
+  const safetyLabel  = getSafetyLabel(details.safetyScore);
+  const pointIcons   = CATEGORY_ICONS[details.category] ?? DEFAULT_ICONS;
+
+  const weatherTemp      = weather.status === 'ready' ? weather.temp      : (weather.status === 'loading' ? '—' : 'N/A');
+  const weatherCondition = weather.status === 'ready' ? weather.condition : (weather.status === 'loading' ? 'Loading…' : 'Data unavailable');
+
+  // ── Crowd window label fallback ───────────────────────────────────────────
+  const crowdLabel = details.crowdWindowLabel
+    ?? (details.crowdLevel ? `${details.crowdLevel} traffic` : 'Peak period');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 bg-black/88 backdrop-blur-md">
-      <div className="relative w-full max-w-5xl max-h-[94dvh] overflow-y-auto no-scrollbar bg-[#040812] rounded-[34px] border border-slate-600/60 animate-fade-in-up shadow-[0_30px_100px_rgba(0,0,0,0.92),inset_0_1px_0_rgba(255,255,255,0.05)]">
-        <div className="relative min-h-[350px] sm:min-h-[430px] overflow-hidden rounded-t-[34px]">
-          <img src={details.image} alt={details.name} className="absolute inset-0 w-full h-full object-cover object-center" />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.12)_0%,rgba(4,8,18,0.28)_38%,rgba(4,8,18,0.98)_100%),linear-gradient(90deg,rgba(4,8,18,0.95)_0%,rgba(4,8,18,0.36)_48%,rgba(4,8,18,0.78)_100%)]"></div>
-          <button onClick={onClose} className="absolute top-5 right-5 sm:top-8 sm:right-8 w-14 h-14 sm:w-16 sm:h-16 bg-black/25 text-white hover:bg-black/55 rounded-full flex items-center justify-center transition-all border border-slate-400/35" aria-label="Close destination details">
-            <span className="material-symbols-outlined text-[34px]">close</span>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/80 backdrop-blur-md"
+      style={{ animation: 'modalOverlayIn 0.28s ease forwards' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${details.name} destination details`}
+    >
+      <div
+        className="relative w-full sm:max-w-2xl lg:max-w-5xl max-h-[96dvh] sm:max-h-[92dvh] overflow-y-auto no-scrollbar bg-[#040812] sm:rounded-[30px] rounded-t-[30px] border border-slate-600/50 shadow-[0_30px_100px_rgba(0,0,0,0.92),inset_0_1px_0_rgba(255,255,255,0.04)]"
+        style={{ animation: 'modalSlideIn 0.38s cubic-bezier(0.16,1,0.3,1) forwards' }}
+      >
+        {/* ── Hero image header ──────────────────────────────────────── */}
+        <div className="relative min-h-[280px] sm:min-h-[380px] overflow-hidden rounded-t-[30px]">
+          <img
+            src={details.image}
+            alt={details.name}
+            className="absolute inset-0 w-full h-full object-cover object-center"
+          />
+          {/* Gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-[rgba(4,8,18,0.35)] to-[#040812]"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[rgba(4,8,18,0.90)] via-transparent to-[rgba(4,8,18,0.55)]"></div>
+
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 sm:top-6 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 bg-black/30 backdrop-blur-sm text-white hover:bg-black/55 rounded-full flex items-center justify-center transition-all border border-white/20 hover:border-white/40 hover:scale-105"
+            aria-label="Close destination details"
+          >
+            <span className="material-symbols-outlined text-[26px] sm:text-[30px]">close</span>
           </button>
-          <div className="absolute left-5 right-5 bottom-10 sm:left-12 sm:right-12 sm:bottom-14">
-            <span className="inline-flex text-[12px] uppercase font-black tracking-widest px-5 py-1.5 rounded-full border border-amber-400/80 bg-black/40 text-[#ffc06e]">{details.category}</span>
-            <h3 className="mt-4 text-[34px] sm:text-[48px] font-black text-white leading-tight tracking-normal">{details.name}</h3>
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5 text-white/82">
-              <span className="flex items-center gap-2 text-[15px] sm:text-[17px] font-extrabold"><span className="material-symbols-outlined text-[25px] text-[#ffc06e]">location_on</span>{locationText}</span>
-              <span className="hidden sm:block w-px h-7 bg-white/22"></span>
-              <span className="flex items-center gap-2 text-[15px] sm:text-[17px] font-semibold"><span className="material-symbols-outlined text-[25px] text-cyan-300">near_me</span>{distanceKm ? `${distanceKm.toLocaleString()} km from you` : locationStatus || 'Data unavailable'}</span>
+
+          {/* Title block */}
+          <div className="absolute left-5 right-16 bottom-8 sm:left-10 sm:right-20 sm:bottom-12">
+            <span className="inline-flex text-[11px] uppercase font-black tracking-widest px-4 py-1.5 rounded-full border border-amber-400/70 bg-black/40 text-[#ffc06e]">
+              {details.category}
+            </span>
+            <h3 className="mt-3 text-[28px] sm:text-[44px] font-black text-white leading-tight tracking-tight">
+              {details.name}
+            </h3>
+            <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-white/85">
+              <span className="flex items-center gap-1.5 text-[14px] sm:text-[16px] font-bold uppercase tracking-wide">
+                <span className="material-symbols-outlined text-[20px] text-[#ffc06e]">location_on</span>
+                {locationText}
+              </span>
+              <span className="hidden sm:block w-px h-5 bg-white/20" />
+              <span className="flex items-center gap-1.5 text-[14px] sm:text-[15px] font-semibold">
+                <span className="material-symbols-outlined text-[20px] text-cyan-300">near_me</span>
+                {distanceKm
+                  ? `${distanceKm.toLocaleString()} km from your location`
+                  : locationStatus || 'Distance unavailable'}
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="p-5 sm:p-10 pt-0 sm:pt-0 space-y-7 text-left">
-          <div className="-mt-9 relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden rounded-[28px] border border-slate-600/50 bg-[#080d18]/92 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-            <DetailPanel icon="verified_user" label="Safety Index" tone="text-green-400"><div className="mt-9 text-center"><p className="text-[34px] font-black leading-none text-green-400">{details.safetyScore}</p><p className="mt-2 text-[17px] font-black text-green-400">Very Safe</p></div></DetailPanel>
-            <DetailPanel icon="healing" label="Diseases in Area" tone="text-rose-400"><div className="mt-4"><span className="inline-flex rounded-full bg-white/8 px-3 py-1 text-[13px] font-bold text-white/82">{details.healthRisk?.level || 'Data unavailable'}</span><p className="mt-4 text-[14px] font-semibold text-white/86">Most Common Disease</p><p className="mt-2 text-[18px] font-black leading-snug text-rose-300">{details.healthRisk?.name || diseaseValue}</p><p className="mt-4 text-[13px] font-semibold text-white/80">Cases reported: <span className="font-black text-rose-300">{details.healthRisk?.cases || 'Data unavailable'}</span></p><button className="mt-4 inline-flex h-11 items-center gap-2 rounded-xl border border-purple-500/55 px-5 text-[13px] font-black text-purple-300">See All <span className="material-symbols-outlined text-[18px]">chevron_right</span></button></div></DetailPanel>
-            <DetailPanel icon="groups" label="Max Crowd Time" tone="text-amber-400"><p className="mt-8 text-center text-[22px] font-black leading-snug text-amber-400">{details.peakCrowdTime || 'Data unavailable'}</p><p className="mt-2 text-center text-[14px] font-bold text-white/80">({details.crowdWindowLabel || details.crowdLevel || 'Live'})</p><CrowdBars /></DetailPanel>
-            <DetailPanel icon="partly_cloudy_day" label="Weather" tone="text-cyan-300"><div className="mt-8 text-center"><p className="text-[34px] font-black leading-none text-cyan-300">{weatherTemp}</p><p className="mt-3 text-[16px] font-bold text-white">{weatherCondition}</p><div className="mt-6 space-y-2 text-left text-[13px] text-white/80"><p>Humidity: <span className="ml-3 font-bold text-white">{weather.humidity ?? '--'}%</span></p><p>Wind: <span className="ml-8 font-bold text-white">{weather.wind ?? '--'} km/h</span></p></div><button className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl border border-cyan-300/45 px-4 text-[13px] font-black text-cyan-200">View Forecast <span className="material-symbols-outlined text-[18px]">chevron_right</span></button></div></DetailPanel>
+        {/* ── Info panels grid ───────────────────────────────────────── */}
+        <div className="px-4 sm:px-8 pb-6 pt-0 space-y-6 text-left">
+          <div className="-mt-7 relative z-10 grid grid-cols-2 lg:grid-cols-4 overflow-hidden rounded-[22px] border border-slate-600/40 bg-[#080d1a]/95 shadow-[0_16px_48px_rgba(0,0,0,0.5)] backdrop-blur-xl divide-y-[1px] divide-white/8 lg:divide-y-0 lg:divide-x-[1px]">
+
+            {/* Safety Index */}
+            <DetailPanel icon="verified_user" label="Safety Index" tone="text-green-400">
+              <div className="flex-1 flex flex-col items-center justify-center pt-3">
+                <p className="text-[36px] sm:text-[40px] font-black leading-none text-green-400">
+                  {details.safetyScore ?? 'N/A'}
+                </p>
+                <p className="mt-2 text-[14px] font-black text-green-400">{safetyLabel}</p>
+              </div>
+            </DetailPanel>
+
+            {/* Diseases in Area */}
+            <DetailPanel icon="healing" label="Diseases in Area" tone="text-rose-400">
+              <div className="mt-2 flex-1">
+                {details.healthRisk ? (
+                  <>
+                    <span className="inline-flex rounded-full bg-white/8 border border-white/12 px-3 py-1 text-[12px] font-bold text-white/80">
+                      {details.healthRisk.level}
+                    </span>
+                    <p className="mt-3 text-[12px] font-semibold text-white/70">Area health risk</p>
+                    <p className="mt-1 text-[15px] font-black leading-snug text-rose-300">
+                      {details.healthRisk.name}
+                    </p>
+                    {details.healthRisk.cases && (
+                      <p className="mt-3 text-[12px] font-semibold text-white/70">
+                        Reported prevalence:{' '}
+                        <span className="font-black text-rose-300">{details.healthRisk.cases}</span>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-4 text-[13px] text-white/50">Data unavailable</p>
+                )}
+              </div>
+            </DetailPanel>
+
+            {/* Max Crowd Time */}
+            <DetailPanel icon="groups" label="Peak Crowd Time" tone="text-amber-400">
+              <div className="mt-2 flex-1 flex flex-col">
+                {details.peakCrowdTime ? (
+                  <>
+                    <p className="text-[16px] sm:text-[18px] font-black leading-snug text-amber-400">
+                      {details.peakCrowdTime}
+                    </p>
+                    <p className="mt-1 text-[12px] font-bold text-white/65">({crowdLabel})</p>
+                    <div className="mt-auto">
+                      <CrowdBars peakCrowdTime={details.peakCrowdTime} />
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-4 text-[13px] text-white/50">Data unavailable</p>
+                )}
+              </div>
+            </DetailPanel>
+
+            {/* Weather */}
+            <DetailPanel icon="partly_cloudy_day" label="Weather" tone="text-cyan-300">
+              <div className="mt-2 flex-1 flex flex-col">
+                {weather.status === 'loading' ? (
+                  <p className="mt-4 text-[13px] text-white/50 animate-pulse">Loading weather…</p>
+                ) : weather.status === 'unavailable' ? (
+                  <p className="mt-4 text-[13px] text-white/50">Data unavailable</p>
+                ) : (
+                  <>
+                    <p className="text-[32px] sm:text-[36px] font-black leading-none text-cyan-300">
+                      {weatherTemp}
+                    </p>
+                    <p className="mt-2 text-[14px] font-bold text-white">{weatherCondition}</p>
+                    <div className="mt-4 space-y-1.5 text-[12px] text-white/70">
+                      <p>
+                        Humidity:{' '}
+                        <span className="ml-2 font-bold text-white">
+                          {weather.humidity != null ? `${weather.humidity}%` : '—'}
+                        </span>
+                      </p>
+                      <p>
+                        Wind:{' '}
+                        <span className="ml-2 font-bold text-white">
+                          {weather.wind != null ? `${weather.wind} km/h` : '—'}
+                        </span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        window.open(
+                          `https://open-meteo.com/en/docs#latitude=${details.coordinates?.lat}&longitude=${details.coordinates?.lon}`,
+                          '_blank'
+                        )
+                      }
+                      className="mt-auto pt-3 inline-flex items-center gap-1.5 rounded-xl border border-cyan-300/35 px-3 py-2 text-[12px] font-bold text-cyan-200 hover:bg-cyan-300/8 transition-colors"
+                    >
+                      View Forecast
+                      <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </DetailPanel>
           </div>
 
+          {/* ── Description ─────────────────────────────────────────── */}
           <div>
-            <h4 className="text-[20px] font-black uppercase text-[#ffc06e] tracking-wide mb-3">Description</h4>
-            <p className="text-white/86 text-[18px] sm:text-[21px] leading-relaxed max-w-4xl">{details.description || 'Data unavailable'}</p>
-            <div className="mt-5 h-px w-32 bg-white/15"></div>
+            <h4 className="text-[14px] sm:text-[15px] font-black uppercase text-[#ffc06e] tracking-widest mb-3">Description</h4>
+            <p className="text-white/82 text-[16px] sm:text-[18px] leading-relaxed">
+              {details.description || 'No description available for this destination.'}
+            </p>
+            <div className="mt-5 h-px w-24 bg-gradient-to-r from-amber-500/60 to-transparent"></div>
           </div>
 
+          {/* ── Interesting Points ───────────────────────────────────── */}
           <div>
-            <h4 className="text-[20px] font-black uppercase text-[#ffc06e] tracking-wide mb-4">Interesting Points</h4>
-            {details.interestingPoints?.length ? (<div className="divide-y divide-white/12">{details.interestingPoints.map((point, index) => (<div key={point} className="flex items-center gap-5 py-4"><span className="material-symbols-outlined text-[29px] text-amber-400 mt-0.5">{pointIcons[index % pointIcons.length]}</span><p className="text-[17px] sm:text-[20px] text-white/84 leading-relaxed">{point}</p></div>))}</div>) : (<p className="text-[13px] text-on-surface-variant/70">Data unavailable</p>)}
+            <h4 className="text-[14px] sm:text-[15px] font-black uppercase text-[#ffc06e] tracking-widest mb-3">Interesting Points</h4>
+            {details.interestingPoints?.length ? (
+              <div className="divide-y divide-white/8">
+                {details.interestingPoints.map((point, index) => (
+                  <div key={index} className="flex items-start gap-4 py-3.5">
+                    <span className="material-symbols-outlined text-[24px] text-amber-400 flex-shrink-0 mt-0.5">
+                      {pointIcons[index % pointIcons.length]}
+                    </span>
+                    <p className="text-[15px] sm:text-[17px] text-white/82 leading-relaxed">{point}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[13px] text-white/50">No highlights available for this destination.</p>
+            )}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
-            <button onClick={(e) => onBookmarkToggle(e, details.id)} className={`h-20 px-7 rounded-2xl flex items-center justify-center gap-2 border transition-all duration-300 ${isBookmarked ? 'bg-primary-container/20 text-primary border-primary-container/30 shadow-[0_0_12px_rgba(255,153,51,0.2)]' : 'bg-[#0b101b] text-white/80 border-slate-600/45 hover:bg-white/5'}`} aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark destination'}><span className="material-symbols-outlined text-[34px]" style={{ fontVariationSettings: isBookmarked ? "'FILL' 1" : "'FILL' 0" }}>bookmark</span></button>
-            <button onClick={() => { alert(`Routing generated for ${details.name}!`); onClose(); }} className="flex-1 h-20 bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-[#321700] rounded-2xl text-[25px] sm:text-[30px] font-black hover:brightness-110 active:scale-[0.98] shadow-[0_14px_35px_rgba(255,153,51,0.28)] transition-all flex items-center justify-center gap-4"><span className="material-symbols-outlined text-[34px]">map</span>Plan Safe Journey</button>
+          {/* ── Action buttons ───────────────────────────────────────── */}
+          <div className="flex gap-3 pt-2 pb-2">
+            <button
+              onClick={(e) => onBookmarkToggle(e, details.id)}
+              className={`h-16 w-16 flex-shrink-0 rounded-2xl flex items-center justify-center border transition-all duration-300 ${
+                isBookmarked
+                  ? 'bg-primary-container/20 text-primary border-primary-container/40 shadow-[0_0_14px_rgba(255,153,51,0.25)]'
+                  : 'bg-[#0b101b] text-white/70 border-slate-600/40 hover:bg-white/5 hover:text-white'
+              }`}
+              aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark destination'}
+            >
+              <span
+                className="material-symbols-outlined text-[28px]"
+                style={{ fontVariationSettings: isBookmarked ? "'FILL' 1" : "'FILL' 0" }}
+              >
+                bookmark
+              </span>
+            </button>
+            <button
+              onClick={() => { alert(`Routing generated for ${details.name}!`); onClose(); }}
+              className="flex-1 h-16 bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-[#321700] rounded-2xl text-[20px] sm:text-[24px] font-black hover:brightness-110 active:scale-[0.98] shadow-[0_12px_32px_rgba(255,153,51,0.30)] transition-all flex items-center justify-center gap-3"
+            >
+              <span className="material-symbols-outlined text-[28px]">map</span>
+              Plan Safe Journey
+            </button>
           </div>
         </div>
       </div>

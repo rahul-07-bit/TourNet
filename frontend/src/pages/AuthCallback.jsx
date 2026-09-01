@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { supabase } from '../services/supabase/supabase';
+import React, { useEffect } from 'react';
 
 const GoogleSVG = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
@@ -10,57 +9,39 @@ const GoogleSVG = () => (
   </svg>
 );
 
+/**
+ * AuthCallback — shown at /auth/callback after Google OAuth or Email OTP redirect.
+ *
+ * What happens here (PKCE flow):
+ *   1. Browser lands at /auth/callback?code=xxx
+ *   2. @supabase/supabase-js detects ?code= via detectSessionInUrl:true and
+ *      automatically calls exchangeCodeForSession() on client initialization.
+ *   3. When the exchange completes, onAuthStateChange in AuthContext fires
+ *      SIGNED_IN with the new session.
+ *   4. AuthContext sets user + authReady=true.
+ *   5. AppGate re-renders: isCallbackPath is false (after redirect to /),
+ *      ProtectedRoute sees user → renders Dashboard.
+ *
+ * This component's only job: render a branded loading screen, then navigate
+ * to / after enough time for the PKCE exchange + onAuthStateChange to complete.
+ * Do NOT call getSession() or onAuthStateChange() here — AuthContext handles it.
+ */
 export default function AuthCallback() {
-  const [error, setError] = useState(null);
-
   useEffect(() => {
-    let mounted = true;
+    // Clear any stale session-storage keys from old implementations
+    sessionStorage.removeItem('tournet_google_otp_triggered');
+    sessionStorage.removeItem('tournet_google_otp_verified');
+    sessionStorage.removeItem('tournet_google_pending_email');
+    sessionStorage.removeItem('tournet_google_pending_name');
 
-    async function handleExchange() {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
+    // Give detectSessionInUrl + onAuthStateChange time to complete (≤1 s normally),
+    // then navigate to root. AuthContext's onAuthStateChange will have already
+    // set the user by then. ProtectedRoute will render Dashboard if authenticated.
+    const timer = setTimeout(() => {
+      window.location.replace(window.location.origin + '/');
+    }, 2000);
 
-        if (session) {
-          if (mounted) {
-            window.location.href = window.location.origin + '/';
-          }
-        } else {
-          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-            if (event === 'SIGNED_IN' && newSession) {
-              subscription.unsubscribe();
-              if (mounted) {
-                window.location.href = window.location.origin + '/';
-              }
-            }
-          });
-
-          // Timeout fallback
-          setTimeout(() => {
-            subscription.unsubscribe();
-            if (mounted) {
-              window.location.href = window.location.origin + '/';
-            }
-          }, 3000);
-        }
-      } catch (err) {
-        console.error('OAuth callback error:', err);
-        if (mounted) {
-          setError(err.message || 'Authentication failed. Redirecting...');
-          setTimeout(() => {
-            if (mounted) {
-              window.location.href = window.location.origin + '/';
-            }
-          }, 3000);
-        }
-      }
-    }
-
-    handleExchange();
-
-    return () => {
-      mounted = false;
-    };
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -117,24 +98,22 @@ export default function AuthCallback() {
       {/* Text */}
       <div style={{ textAlign: 'center', zIndex: 1 }}>
         <p style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
-          {error ? 'Authentication Error' : 'Completing Sign-In'}
+          Completing Sign-In
         </p>
-        <p style={{ margin: 0, fontSize: 13, color: error ? 'rgba(255,100,100,0.85)' : 'rgba(190,165,140,0.65)', lineHeight: 1.5, padding: '0 20px' }}>
-          {error ? error : 'Establishing secure session with Google...'}
+        <p style={{ margin: 0, fontSize: 13, color: 'rgba(190,165,140,0.65)', lineHeight: 1.5, padding: '0 20px' }}>
+          Establishing secure session…
         </p>
       </div>
 
       {/* Progress bar */}
-      {!error && (
-        <div style={{ width: 200, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', zIndex: 1 }}>
-          <div style={{
-            height: '100%',
-            background: 'linear-gradient(90deg, #4285F4, #34A853, #EA4335, #FBBC05)',
-            borderRadius: 2,
-            animation: 'oauthProgress 2s ease-in-out infinite',
-          }} />
-        </div>
-      )}
+      <div style={{ width: 200, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', zIndex: 1 }}>
+        <div style={{
+          height: '100%',
+          background: 'linear-gradient(90deg, #4285F4, #34A853, #EA4335, #FBBC05)',
+          borderRadius: 2,
+          animation: 'oauthProgress 2s ease-in-out infinite',
+        }} />
+      </div>
 
       <style>{`
         @keyframes oauthPulse   { 0%,100%{box-shadow:0 0 32px rgba(255,130,30,0.60)} 50%{box-shadow:0 0 52px rgba(255,130,30,0.85)} }
@@ -144,3 +123,5 @@ export default function AuthCallback() {
     </div>
   );
 }
+
+

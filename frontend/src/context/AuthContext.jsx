@@ -3,7 +3,7 @@
  *
  * Provides:
  *  - Passwordless Email OTP Authentication (Gmail OTP using Supabase)
- *  - Intercepted Google OAuth + Gmail OTP Verification flow
+ *  - Google OAuth (direct, no secondary OTP step)
  *  - Session persistence (survives refresh via Supabase or localStorage in sandbox mode)
  *  - Automatic profile creation in `profiles` table / localStorage
  *  - Guest data merge on first login
@@ -14,7 +14,7 @@ import React, {
   createContext, useContext, useState,
   useEffect, useCallback, useRef,
 } from 'react';
-import { supabase, isConfigured, isMockSandbox, OAUTH_REDIRECT_URL, cleanOAuthUrl } from '../services/supabase/supabase';
+import { supabase, isConfigured, isMockSandbox, cleanOAuthUrl } from '../services/supabase/supabase';
 import { getProfile, upsertProfile, updateProfile, mergeGuestData } from '../services/supabase/userService';
 
 /* ─────────────────────────────────────────────────────────────
@@ -72,9 +72,15 @@ function normalizeError(err) {
     msg.includes('rate limit') ||
     msg.includes('too many requests') ||
     msg.includes('over_email_send_rate_limit') ||
-    msg.includes('429')
+    msg.includes('429') ||
+    msg.includes('security purposes') ||
+    msg.includes('for security') ||
+    msg.includes('only request this after')
   ) {
-    return 'OTP rate limit reached. Please wait 30–60 seconds and try again, or request a new code after a short pause.';
+    // Extract the seconds from Supabase's message if present (e.g. "...after 22 seconds")
+    const secMatch = err.message?.match(/after\s+(\d+)\s+second/i);
+    const waitSec  = secMatch ? secMatch[1] : '30–60';
+    return `Please wait ${waitSec} seconds before requesting a new OTP.`;
   }
   if (msg.includes('jwt expired') || msg.includes('session_expired')) {
     return 'Your session has expired. Please sign in again.';
@@ -121,41 +127,29 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // Restore existing session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const authUser = session?.user ?? null;
-      setUser(authUser);
-      if (authUser) loadProfile(authUser);
-      setIsLoading(false);
-      setAuthReady(true);
-    });
-
-    // React to login / logout / token refresh / OAuth redirect
+    /**
+     * IMPORTANT: Do NOT call getSession() in parallel with onAuthStateChange().
+     *
+     * onAuthStateChange fires immediately on registration with event
+     * 'INITIAL_SESSION' and the current stored session (or null). This is the
+     * single, authoritative source of auth truth. Running getSession() in a
+     * separate .then() creates a race: whichever resolves last wins, and
+     * 'SIGNED_OUT' from onAuthStateChange can arrive AFTER getSession() sets
+     * the user — wiping a valid session and causing the login loop.
+     *
+     * The correct pattern (per Supabase docs v2):
+     *   1. Register onAuthStateChange — it fires INITIAL_SESSION synchronously
+     *      with whatever is stored in localStorage/cookies.
+     *   2. Only THAT callback sets authReady=true.
+     *   3. getSession() is called once inside the INITIAL_SESSION handler to
+     *      confirm the session is still valid (optional safety check).
+     */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         const authUser = session?.user ?? null;
 
         if (authUser) {
-          // Check if Google OAuth login needs OTP verification
-          const isGoogle = authUser.app_metadata?.provider === 'google';
-          const otpVerified = sessionStorage.getItem('tournet_google_otp_verified') === 'true';
-
-          if (isGoogle && !otpVerified && !isMockSandbox) {
-            const email = authUser.email;
-            const name = authUser.user_metadata?.full_name || authUser.user_metadata?.name || email.split('@')[0];
-
-            sessionStorage.setItem('tournet_google_pending_email', email);
-            sessionStorage.setItem('tournet_google_pending_name', name);
-            sessionStorage.setItem('tournet_google_otp_triggered', 'true');
-
-            // Immediately sign out to clear active session and prevent unauthorized access
-            await supabase.auth.signOut();
-
-            // Refresh client to clear URL params and trigger UI OTP verification view
-            window.location.reload();
-            return;
-          }
-
+          // Authenticated — load/create profile regardless of provider
           const prof = await loadProfile(authUser);
           setUser(authUser);
           if (!mergedRef.current && prof) {
@@ -169,6 +163,7 @@ export function AuthProvider({ children }) {
           mergedRef.current = false;
         }
 
+        // authReady is set ONLY here — never from a parallel getSession() call
         setIsLoading(false);
         setAuthReady(true);
       }
@@ -269,8 +264,9 @@ export function AuthProvider({ children }) {
         throw new Error('Verification succeeded but no session was created.');
       }
 
-      // Let Supabase auth state listeners populate the authenticated user/session.
-      window.location.href = window.location.origin + '/auth/callback';
+      // Session is now in localStorage. Navigate directly to root — ProtectedRoute
+      // will render Dashboard once onAuthStateChange fires SIGNED_IN.
+      window.location.replace(window.location.origin + '/');
     } catch (err) {
       throw new Error(normalizeError(err));
     } finally {
@@ -330,13 +326,8 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  /** Sign out and clear Google OTP security tokens */
+  /** Sign out */
   const logout = useCallback(async () => {
-    sessionStorage.removeItem('tournet_google_otp_verified');
-    sessionStorage.removeItem('tournet_google_pending_email');
-    sessionStorage.removeItem('tournet_google_pending_name');
-    sessionStorage.removeItem('tournet_google_otp_triggered');
-    
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
