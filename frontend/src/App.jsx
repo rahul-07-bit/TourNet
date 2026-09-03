@@ -148,8 +148,6 @@ function UnauthenticatedShell() {
    Decides what to render based on auth state + OAuth callback detection.
 ═══════════════════════════════════════════════════════════════════ */
 function AppGate() {
-  const { authReady } = useAuth();
-
   const isCallbackPath = window.location.pathname === '/auth/callback';
 
   if (isCallbackPath) {
